@@ -1,0 +1,7 @@
+[package]
+name = "rusto"
+version = "0.1.0"
+authors = ["Mason Ashbridge <masonjash@gmail.com>"]
+
+[dependencies]
+glium = "*"
