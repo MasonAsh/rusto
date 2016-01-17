@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate glium;
 
+mod config;
 mod renderer;
 mod game;
 
