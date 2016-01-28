@@ -4,7 +4,6 @@ extern crate gl;
 use std::thread;
 use config::load_config_file;
 use self::sdl2::event::{Event};
-use self::gl::types::*;
 
 use renderer::Renderer;
 use renderer::backends::{renderer_factory, determine_best_renderer};
@@ -73,7 +72,10 @@ impl Game {
 
         let gl_ctx = window.gl_create_context().unwrap();
 
-        window.gl_make_current(&gl_ctx);
+        match window.gl_make_current(&gl_ctx) {
+            Ok(_)  => (),
+            Err(x) => panic!(format!("failed to bind window to OpenGL. Reason: {}", x))
+        }
 
         gl::load_with(|name| vid_ctx.gl_get_proc_address(name) as *const _);
 
@@ -91,14 +93,20 @@ impl Game {
         }
     }
 
-    fn do_keyboard_event(&mut self) {
+    fn key_up_event(&mut self, keycode: sdl2::keyboard::Keycode) {
+        match keycode {
+            sdl2::keyboard::Keycode::Escape => self.running = false,
+            _                               => (),
+        }
     }
 
     fn do_window_events(&mut self) {
-        for ev in self.events.poll_iter() {
+        let events: Vec<Event> = self.events.poll_iter().collect();
+        for ev in events {
             match ev {
-                Event::Quit{..} => self.running = false,
-                _               => (),
+                Event::Quit{..}                   => self.running = false,
+                Event::KeyUp{keycode, ..}         => self.key_up_event(keycode.unwrap()),
+                _                                 => (),
             }
         }
     }

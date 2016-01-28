@@ -1,9 +1,6 @@
 use super::Renderer;
 use self::opengl::OpenGLRenderer;
 
-use std::error::Error;
-use std::fmt::Display;
-
 pub mod opengl;
 
 pub fn determine_best_renderer() -> String {
