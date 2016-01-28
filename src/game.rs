@@ -6,6 +6,9 @@ use config::load_config_file;
 use self::sdl2::event::{Event};
 use self::gl::types::*;
 
+use renderer::Renderer;
+use renderer::backends::{renderer_factory, determine_best_renderer};
+
 pub struct Game {
     running: bool,
     sdl: sdl2::Sdl,
@@ -13,6 +16,7 @@ pub struct Game {
     events: sdl2::EventPump,
     vid_ctx: sdl2::VideoSubsystem,
     gl_ctx: sdl2::video::GLContext,
+    renderer: Box<Renderer>,
 }
 
 impl Game {
@@ -73,6 +77,9 @@ impl Game {
 
         gl::load_with(|name| vid_ctx.gl_get_proc_address(name) as *const _);
 
+        let renderer_name = determine_best_renderer();
+        let renderer = renderer_factory(&renderer_name).unwrap();
+
         Game {
             running: true,
             sdl: sdl,
@@ -80,6 +87,7 @@ impl Game {
             events: events,
             vid_ctx: vid_ctx,
             gl_ctx: gl_ctx,
+            renderer: renderer,
         }
     }
 
@@ -96,13 +104,9 @@ impl Game {
     }
 
     fn render(&mut self) {
-        unsafe {
-            gl::ClearColor(1.0, 0.3, 0.3, 1.0);
-            gl::Clear(gl::COLOR_BUFFER_BIT);
+        self.renderer.clear(1.0, 0.3, 0.3, 1.0);
 
-
-            self.window.gl_swap_window();
-        }
+        self.window.gl_swap_window();
     }
 
     pub fn run(&mut self) {
