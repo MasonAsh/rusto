@@ -1,28 +1,30 @@
-extern crate glium;
+extern crate sdl2;
+extern crate gl;
 
 use std::thread;
-use renderer;
-use std::collections::HashMap;
-
 use config::load_config_file;
+use self::sdl2::event::{Event};
+use self::gl::types::*;
 
 pub struct Game {
-    game_name: String,
     running: bool,
-    device: renderer::Device,
-    config: HashMap<String, String>
+    sdl: sdl2::Sdl,
+    window: sdl2::video::Window,
+    events: sdl2::EventPump,
+    vid_ctx: sdl2::VideoSubsystem,
+    gl_ctx: sdl2::video::GLContext,
 }
 
 impl Game {
     pub fn new() -> Game {
-        use glium::DisplayBuild;
-        use glium::glutin::get_primary_monitor;
+        let sdl = sdl2::init().unwrap();
+        let vid_ctx = sdl.video().unwrap();
 
         let config = load_config_file();
 
         let width: u32;
-        let height: u32;
         let window_title: String;
+        let height: u32;
         let fullscreen: bool;
 
         match config.get("width") {
@@ -54,42 +56,53 @@ impl Game {
             }
         }
 
-        let mut builder = glium::glutin::WindowBuilder::new();
+        let mut window: sdl2::video::Window;
 
-        builder = builder.with_dimensions(width, height)
-            .with_title(window_title);
-
-        if fullscreen {
-            builder = builder.with_fullscreen(get_primary_monitor());
+        if !fullscreen {
+            window = vid_ctx.window(window_title.as_ref(), width, height).position_centered().opengl().build().unwrap();
+        } else {
+            window = vid_ctx.window(window_title.as_ref(), width, height).position_centered().opengl().fullscreen().build().unwrap();
         }
 
-        let display = builder.build_glium().unwrap();
-        
+        window.show();
+        let events = sdl.event_pump().unwrap();
+
+        let gl_ctx = window.gl_create_context().unwrap();
+
+        window.gl_make_current(&gl_ctx);
+
+        gl::load_with(|name| vid_ctx.gl_get_proc_address(name) as *const _);
+
         Game {
-            game_name: "My Super Game!".to_string(),
             running: true,
-            device: renderer::Device::new(display),
-            config: config,
+            sdl: sdl,
+            window: window,
+            events: events,
+            vid_ctx: vid_ctx,
+            gl_ctx: gl_ctx,
         }
+    }
+
+    fn do_keyboard_event(&mut self) {
     }
 
     fn do_window_events(&mut self) {
-        for ev in self.device.display.poll_events() {
+        for ev in self.events.poll_iter() {
             match ev {
-                glium::glutin::Event::Closed => self.running = false,
-                _                            => ()
+                Event::Quit{..} => self.running = false,
+                _               => (),
             }
         }
     }
-    
-    fn render(&mut self) {
-        use glium::Surface;
-        
-        let mut target = self.device.display.draw();
 
-        target.clear_color(0.0, 0.0, 1.0, 1.0);
-        
-        target.finish().unwrap();
+    fn render(&mut self) {
+        unsafe {
+            gl::ClearColor(1.0, 0.3, 0.3, 1.0);
+            gl::Clear(gl::COLOR_BUFFER_BIT);
+
+
+            self.window.gl_swap_window();
+        }
     }
 
     pub fn run(&mut self) {
@@ -101,3 +114,4 @@ impl Game {
         }
     }
 }
+

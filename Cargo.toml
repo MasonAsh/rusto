@@ -4,4 +4,6 @@ version = "0.1.0"
 authors = ["Mason Ashbridge <masonjash@gmail.com>"]
 
 [dependencies]
-glium = "*"
+gl="*"
+sdl2="*"
+byteorder="*"
