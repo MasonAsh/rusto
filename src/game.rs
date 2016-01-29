@@ -16,9 +16,7 @@ pub struct Game {
     vid_ctx: sdl2::VideoSubsystem,
     gl_ctx: sdl2::video::GLContext,
     renderer: Box<Renderer>,
-    vbo: VBOHandle,
-    ibo: IBOHandle,
-    program: ProgramHandle,
+    geometry: Box<Geometry>,
 }
 
 impl Game {
@@ -88,22 +86,21 @@ impl Game {
         let mut vdesc = VertexLayoutDescription::new();
         vdesc.add_element("position", VertexElementType::F32F32);
 
-
-        let vbo_data = BufferData::new_initialized(vec![
+        let vertex_data = BufferData::new_initialized(vec![
             -0.5f32, -0.5,
             0.0,     0.5,
             0.5,     0.0,
         ]);
 
-        let vbo = renderer.create_vertex_buffer_object(vbo_data).unwrap();
+        //let vbo = renderer.create_vertex_buffer_object(vbo_data).unwrap();
 
-        let vlayout = renderer.create_vertex_layout(vdesc, vbo).unwrap();
+        //let vlayout = renderer.create_vertex_layout(vdesc, vbo).unwrap();
 
-        let ibo_data = BufferData::new_initialized(vec![
+        let index_data = BufferData::new_initialized(vec![
             0u32, 1, 2
         ]);
 
-        let ibo = renderer.create_index_buffer_object(IndexType::U32, ibo_data).unwrap();
+        //let ibo = renderer.create_index_buffer_object(IndexType::U32, ibo_data).unwrap();
 
         let vert_src = r#"
 #version 140
@@ -125,7 +122,9 @@ void main() {
 }
 "#;
 
-        let program = renderer.create_program(vert_src.to_string(), frag_src.to_string()).unwrap();
+        //let program = renderer.create_program(vert_src.to_string(), frag_src.to_string()).unwrap();
+
+        let geometry = renderer.create_geometry(vertex_data, index_data, vdesc, IndexType::U32, vert_src, frag_src);
 
         Game {
             running: true,
@@ -135,9 +134,7 @@ void main() {
             vid_ctx: vid_ctx,
             gl_ctx: gl_ctx,
             renderer: renderer,
-            vbo: vbo,
-            ibo: ibo,
-            program: program,
+            geometry: geometry,
         }
     }
 
@@ -162,7 +159,8 @@ void main() {
     fn render(&mut self) {
         self.renderer.clear(1.0, 0.3, 0.3, 1.0);
 
-        self.renderer.draw(self.vbo, self.ibo, self.program);
+        //self.renderer.draw(self.vbo, self.ibo, self.program);
+        self.renderer.draw_geometry(&self.geometry);
 
         self.window.gl_swap_window();
     }

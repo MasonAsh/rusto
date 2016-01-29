@@ -11,9 +11,15 @@ use self::gl::types::*;
 
 type GLHandle = u32;
 
+type Handle = usize;
+
+type VBOHandle = Handle;
+type VAOHandle = Handle;
+type IBOHandle = Handle;
+type ProgramHandle = Handle;
+
 struct GLVbo {
     id: GLHandle,
-    //layout: VLayoutHandle
 }
 
 struct GLIbo {
@@ -28,17 +34,29 @@ struct GLProg {
     fsid: GLHandle,
 }
 
-struct GLVLayout {
+struct GLVertexArrayObject {
     id: GLHandle,
-    desc: VertexLayoutDescription,
-    vbo: VBOHandle,
 }
 
 pub struct OpenGLRenderer {
-    vlayouts: Vec<GLVLayout>,
+    vlayouts: Vec<GLVertexArrayObject>,
     vbos: Vec<GLVbo>,
     ibos: Vec<GLIbo>,
     progs: Vec<GLProg>,
+}
+
+pub struct OpenGLGeometry {
+    vbo: VBOHandle,
+    ibo: IBOHandle,
+    vao: VAOHandle,
+    program: ProgramHandle,
+    layout_desc: VertexLayoutDescription,
+}
+
+impl Geometry for OpenGLGeometry {
+    fn get_vertex_layout_description(&self) -> &VertexLayoutDescription {
+        &self.layout_desc
+    }
 }
 
 impl OpenGLRenderer {
@@ -69,11 +87,11 @@ impl OpenGLRenderer {
         }
     }
 
-    fn compile_shader(&self, src: String, shader_type: GLenum) -> GLuint {
+    fn compile_shader(&self, src: &str, shader_type: GLenum) -> GLuint {
         unsafe {
             let shader = gl::CreateShader(shader_type);
 
-            let c_str = CString::new(src).unwrap();
+            let c_str = CString::new(src.as_bytes()).unwrap();
 
             gl::ShaderSource(shader, 1, &c_str.as_ptr(), ptr::null());
             gl::CompileShader(shader);
@@ -94,17 +112,8 @@ impl OpenGLRenderer {
             shader
         }
     }
-}
 
-impl Renderer for OpenGLRenderer {
-    fn clear(&mut self, r: f32, g: f32, b: f32, a: f32) {
-        unsafe {
-            gl::ClearColor(r, g, b, a);
-            gl::Clear(gl::COLOR_BUFFER_BIT);
-        }
-    }
-
-    fn create_vertex_layout(&mut self, desc: vertex_layout::VertexLayoutDescription, vbo: VBOHandle) -> Result<VLayoutHandle, String> {
+    fn create_vertex_array_object(&mut self, desc: &VertexLayoutDescription, vbo: VBOHandle) -> Result<VAOHandle, String> {
         let mut vao = 0;
 
         unsafe {
@@ -116,7 +125,7 @@ impl Renderer for OpenGLRenderer {
             for elem in desc.elements.iter() {
                 vertex_size += elem.vtype.get_size_of() as i32;
             }
-            
+
             self.bind_vertex_buffer(vbo);
 
             for (i,elem) in desc.elements.iter().enumerate() {
@@ -131,10 +140,8 @@ impl Renderer for OpenGLRenderer {
             }
         }
 
-        self.vlayouts.push(GLVLayout {
+        self.vlayouts.push(GLVertexArrayObject {
             id: vao,
-            desc: desc,
-            vbo: vbo,
         });
 
         Ok(self.vlayouts.len() - 1)
@@ -151,7 +158,6 @@ impl Renderer for OpenGLRenderer {
 
         let vbo = GLVbo {
             id: buf_id,
-            //layout: hlayout
         };
 
         self.vbos.push(vbo);
@@ -186,7 +192,7 @@ impl Renderer for OpenGLRenderer {
         Ok(self.vbos.len() - 1)
     }
 
-    fn create_program(&mut self, vert_src: String, frag_src: String) -> Result<ProgramHandle, String> {
+    fn create_program(&mut self, vert_src: &str, frag_src: &str) -> Result<ProgramHandle, String> {
         let vs = self.compile_shader(vert_src, gl::VERTEX_SHADER);
         let fs = self.compile_shader(frag_src, gl::FRAGMENT_SHADER);
 
@@ -207,7 +213,7 @@ impl Renderer for OpenGLRenderer {
                 let mut buf: Vec<&[u8]> = Vec::new();
                 buf.set_len((len as usize) - 1);
                 gl::GetProgramInfoLog(program, len, ptr::null_mut(), buf.as_mut_ptr() as *mut GLchar);
-                panic!("{}", str::from_utf8(&buf[0]).ok().expect("ProgramInfoLog not valid utf8"));
+                panic!("{}", str::from_utf8(&buf[0]).ok().expect("programinfolog not valid utf8"));
             }
         }
 
@@ -222,7 +228,7 @@ impl Renderer for OpenGLRenderer {
         Ok(self.progs.len() - 1)
     }
 
-    fn draw(&mut self, vboh: VBOHandle, iboh: IBOHandle, progh: ProgramHandle) {
+    fn draw_vertex_arrays(&mut self, vboh: VBOHandle, iboh: IBOHandle, progh: ProgramHandle) {
         let vbo = &self.vbos[vboh];
         let ibo = &self.ibos[iboh];
         let prog = &self.progs[progh];
@@ -234,6 +240,39 @@ impl Renderer for OpenGLRenderer {
         unsafe {
             gl::DrawArrays(gl::TRIANGLES, 0, ibo.count as i32);
         }
+    }
+}
+
+impl Renderer for OpenGLRenderer {
+    fn clear(&mut self, r: f32, g: f32, b: f32, a: f32) {
+        unsafe {
+            gl::ClearColor(r, g, b, a);
+            gl::Clear(gl::COLOR_BUFFER_BIT);
+        }
+    }
+
+    fn create_geometry(&mut self, vertex_data: BufferData, index_data: BufferData, layout: VertexLayoutDescription, index_type: IndexType, vert_src: &str, frag_src: &str) -> Box<Geometry> {
+        let vbo = self.create_vertex_buffer_object(vertex_data).unwrap();
+        let vao = self.create_vertex_array_object(&layout, vbo).unwrap();
+        let ibo = self.create_index_buffer_object(index_type, index_data).unwrap();
+        let prog = self.create_program(vert_src, frag_src).unwrap();
+
+        let geom = OpenGLGeometry {
+            vbo: vbo,
+            vao: vao,
+            ibo: ibo,
+            program: prog,
+            layout_desc: layout,
+        };
+
+        Box::new(geom)
+    }
+
+    fn draw_geometry(&mut self, geom: &Box<Geometry>) {
+    	// This is pretty lame. There should be a better way to convert Box<Geometry> to Box<OpenGLGeometry>
+    	// Perhaps this is just an unsafe design by nature however.
+        let glgeom: &Box<OpenGLGeometry> = unsafe { mem::transmute(geom) };
+        self.draw_vertex_arrays(glgeom.vbo, glgeom.ibo, glgeom.program)
     }
 }
 
