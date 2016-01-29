@@ -5,7 +5,7 @@ use std::thread;
 use config::load_config_file;
 use self::sdl2::event::{Event};
 
-use renderer::Renderer;
+use renderer::*;
 use renderer::backends::{renderer_factory, determine_best_renderer};
 
 pub struct Game {
@@ -16,6 +16,9 @@ pub struct Game {
     vid_ctx: sdl2::VideoSubsystem,
     gl_ctx: sdl2::video::GLContext,
     renderer: Box<Renderer>,
+    vbo: VBOHandle,
+    ibo: IBOHandle,
+    program: ProgramHandle,
 }
 
 impl Game {
@@ -80,7 +83,49 @@ impl Game {
         gl::load_with(|name| vid_ctx.gl_get_proc_address(name) as *const _);
 
         let renderer_name = determine_best_renderer();
-        let renderer = renderer_factory(&renderer_name).unwrap();
+        let mut renderer = renderer_factory(&renderer_name).unwrap();
+
+        let mut vdesc = VertexLayoutDescription::new();
+        vdesc.add_element("position", VertexElementType::F32F32);
+
+
+        let vbo_data = BufferData::new_initialized(vec![
+            -0.5f32, -0.5,
+            0.0,     0.5,
+            0.5,     0.0,
+        ]);
+
+        let vbo = renderer.create_vertex_buffer_object(vbo_data).unwrap();
+
+        let vlayout = renderer.create_vertex_layout(vdesc, vbo).unwrap();
+
+        let ibo_data = BufferData::new_initialized(vec![
+            0u32, 1, 2
+        ]);
+
+        let ibo = renderer.create_index_buffer_object(IndexType::U32, ibo_data).unwrap();
+
+        let vert_src = r#"
+#version 140
+
+in vec2 position;
+
+void main() {
+    gl_Position = vec4(position, 0.0, 1.0);
+}
+"#;
+
+        let frag_src = r#"
+#version 140
+
+out vec4 color;
+
+void main() {
+    color = vec4(0.0, 0.0, 1.0, 1.0);
+}
+"#;
+
+        let program = renderer.create_program(vert_src.to_string(), frag_src.to_string()).unwrap();
 
         Game {
             running: true,
@@ -90,6 +135,9 @@ impl Game {
             vid_ctx: vid_ctx,
             gl_ctx: gl_ctx,
             renderer: renderer,
+            vbo: vbo,
+            ibo: ibo,
+            program: program,
         }
     }
 
@@ -113,6 +161,8 @@ impl Game {
 
     fn render(&mut self) {
         self.renderer.clear(1.0, 0.3, 0.3, 1.0);
+
+        self.renderer.draw(self.vbo, self.ibo, self.program);
 
         self.window.gl_swap_window();
     }
