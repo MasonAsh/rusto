@@ -1,8 +1,10 @@
 extern crate sdl2;
 extern crate gl;
+extern crate rand;
 
 use std::thread;
 use config::load_config_file;
+use self::rand::random;
 use self::sdl2::event::{Event};
 
 use renderer::*;
@@ -84,30 +86,41 @@ impl Game {
         let mut renderer = renderer_factory(&renderer_name).unwrap();
 
         let mut vdesc = VertexLayoutDescription::new();
-        vdesc.add_element("position", VertexElementType::F32F32);
+        vdesc.add_element("position".to_string(), VertexElementType::F32F32);
+        vdesc.add_element("color".to_string(), VertexElementType::F32F32F32F32);
 
-        let vertex_data = BufferData::new_initialized(vec![
-            -0.5f32, -0.5,
-            0.0,     0.5,
-            0.5,     0.0,
-        ]);
+		let num_tris = 100;
 
-        //let vbo = renderer.create_vertex_buffer_object(vbo_data).unwrap();
+        let mut randoms: Vec<f32> = Vec::new();
 
-        //let vlayout = renderer.create_vertex_layout(vdesc, vbo).unwrap();
+        for _ in 0..(num_tris * 3) {
+            randoms.push(random::<f32>() * 2.0 - 1.0);
+            randoms.push(random::<f32>() * 2.0 - 1.0);
+            randoms.push(random::<f32>());
+            randoms.push(random::<f32>());
+            randoms.push(random::<f32>());
+            randoms.push(random::<f32>());
+        }
 
-        let index_data = BufferData::new_initialized(vec![
-            0u32, 1, 2
-        ]);
+        let vertex_data = BufferData::new_initialized(randoms);
 
-        //let ibo = renderer.create_index_buffer_object(IndexType::U32, ibo_data).unwrap();
+        let mut index_vec: Vec<u32> = Vec::new();
+
+        for i in 0..num_tris*3 {
+            index_vec.push(i as u32);
+        }
+
+        let index_data = BufferData::new_initialized(index_vec);
 
         let vert_src = r#"
 #version 140
 
 in vec2 position;
+in vec4 color;
+out vec4 ocolor;
 
 void main() {
+    ocolor = color;
     gl_Position = vec4(position, 0.0, 1.0);
 }
 "#;
@@ -115,14 +128,13 @@ void main() {
         let frag_src = r#"
 #version 140
 
+in vec4 ocolor;
 out vec4 color;
 
 void main() {
-    color = vec4(0.0, 0.0, 1.0, 1.0);
+    color = ocolor;
 }
 "#;
-
-        //let program = renderer.create_program(vert_src.to_string(), frag_src.to_string()).unwrap();
 
         let geometry = renderer.create_geometry(vertex_data, index_data, vdesc, IndexType::U32, vert_src, frag_src);
 
@@ -159,7 +171,6 @@ void main() {
     fn render(&mut self) {
         self.renderer.clear(1.0, 0.3, 0.3, 1.0);
 
-        //self.renderer.draw(self.vbo, self.ibo, self.program);
         self.renderer.draw_geometry(&self.geometry);
 
         self.window.gl_swap_window();

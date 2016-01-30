@@ -48,17 +48,17 @@ impl VertexLayoutDescription {
         }
     }
 
-    pub fn add_element(&mut self, name: &str, vtype: VertexElementType) {
+    pub fn add_element(&mut self, name: String, vtype: VertexElementType) {
         let offset: usize;
 
         match self.elements.last() {
-            Some(x) => offset = x.offset + vtype.get_size_of(),
+            Some(x) => offset = x.offset + x.vtype.get_size_of(),
             None    => offset = 0,
         }
 
         self.elements.push(VertexElement {
             vtype: vtype,
-            name: name.clone().to_string(),
+            name: name,
             offset: offset,
         });
     }

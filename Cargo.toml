@@ -7,3 +7,5 @@ authors = ["Mason Ashbridge <masonjash@gmail.com>"]
 gl="*"
 sdl2="*"
 byteorder="*"
+cgmath="*"
+rand="*"

@@ -113,7 +113,7 @@ impl OpenGLRenderer {
         }
     }
 
-    fn create_vertex_array_object(&mut self, desc: &VertexLayoutDescription, vbo: VBOHandle) -> Result<VAOHandle, String> {
+    fn create_vertex_array_object(&mut self, desc: &VertexLayoutDescription, vbo: VBOHandle, progh: ProgramHandle) -> Result<VAOHandle, String> {
         let mut vao = 0;
 
         unsafe {
@@ -128,6 +128,10 @@ impl OpenGLRenderer {
 
             self.bind_vertex_buffer(vbo);
 
+			self.bind_program(progh);
+			
+			let progid = self.progs[progh].id;
+
             for (i,elem) in desc.elements.iter().enumerate() {
                 let index = i as u32;
                 let num_components = elem.vtype.get_num_components();
@@ -135,8 +139,16 @@ impl OpenGLRenderer {
                     VertexElementType::F32 | VertexElementType::F32F32 |
                     VertexElementType::F32F32F32 | VertexElementType::F32F32F32F32 => gl::FLOAT,
                 };
-                gl::EnableVertexAttribArray(index);
-                gl::VertexAttribPointer(index, num_components, elem_type, gl::FALSE, vertex_size, mem::transmute(elem.offset));
+                
+                let attr_name_cstr = CString::new(elem.name.clone()).unwrap().as_ptr();
+                
+                //let index = gl::GetAttribLocation(progid, attr_name_cstr);
+                gl::BindAttribLocation(progid, index, attr_name_cstr);
+                
+                println!("attrib loc {} {}", elem.name, gl::GetAttribLocation(progid, attr_name_cstr));
+                
+                gl::EnableVertexAttribArray(index as u32);
+                gl::VertexAttribPointer(index as u32, num_components, elem_type, gl::FALSE, 0, mem::transmute(elem.offset));
             }
         }
 
@@ -196,10 +208,10 @@ impl OpenGLRenderer {
         let vs = self.compile_shader(vert_src, gl::VERTEX_SHADER);
         let fs = self.compile_shader(frag_src, gl::FRAGMENT_SHADER);
 
-        let program = 0;
+        let program;
 
         unsafe {
-            let program = gl::CreateProgram();
+            program = gl::CreateProgram();
             gl::AttachShader(program, vs);
             gl::AttachShader(program, fs);
             gl::LinkProgram(program);
@@ -253,9 +265,9 @@ impl Renderer for OpenGLRenderer {
 
     fn create_geometry(&mut self, vertex_data: BufferData, index_data: BufferData, layout: VertexLayoutDescription, index_type: IndexType, vert_src: &str, frag_src: &str) -> Box<Geometry> {
         let vbo = self.create_vertex_buffer_object(vertex_data).unwrap();
-        let vao = self.create_vertex_array_object(&layout, vbo).unwrap();
-        let ibo = self.create_index_buffer_object(index_type, index_data).unwrap();
         let prog = self.create_program(vert_src, frag_src).unwrap();
+        let vao = self.create_vertex_array_object(&layout, vbo, prog).unwrap();
+        let ibo = self.create_index_buffer_object(index_type, index_data).unwrap();
 
         let geom = OpenGLGeometry {
             vbo: vbo,
@@ -272,7 +284,7 @@ impl Renderer for OpenGLRenderer {
     	// This is pretty lame. There should be a better way to convert Box<Geometry> to Box<OpenGLGeometry>
     	// Perhaps this is just an unsafe design by nature however.
         let glgeom: &Box<OpenGLGeometry> = unsafe { mem::transmute(geom) };
-        self.draw_vertex_arrays(glgeom.vbo, glgeom.ibo, glgeom.program)
+        self.draw_vertex_arrays(glgeom.vbo, glgeom.ibo, glgeom.program);
     }
 }
 
