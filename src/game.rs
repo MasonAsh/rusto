@@ -121,13 +121,17 @@ uniform Misc {
   float arbitrary_x_offset;
 };
 
+uniform DoMultipleBuffersWork {
+  float yes;
+};
+
 in vec2 position;
 in vec4 color;
 out vec4 ocolor;
 
 void main() {
     ocolor = color;
-    gl_Position = vec4(position.x + arbitrary_x_offset, position.y + sin(time), 0.0, 1.0);
+    gl_Position = vec4(position.x + arbitrary_x_offset + yes, position.y + sin(time), 0.0, 1.0);
 }
 "#;
 
@@ -145,7 +149,8 @@ void main() {
         let mut geometry = renderer.create_geometry(vertex_data, index_data, vdesc, IndexType::U32, vert_src, frag_src);
 
         geometry.update_params(&|params| {
-            params.set("arbitrary_x_offset", ParamValue::F32(0.2));     
+            params.set("arbitrary_x_offset", ParamValue::F32(0.2));
+            params.set("yes", ParamValue::F32(-0.2));
         });
 
         Game {

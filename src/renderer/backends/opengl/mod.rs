@@ -222,7 +222,7 @@ impl OpenGLRenderer {
         unsafe {
             gl::GenBuffers(1, &mut buf_id);
             gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, buf_id);
-            gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, data.bytes.len() as isize, mem::transmute(&data.bytes[0]), gl::DYNAMIC_DRAW);
+            gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, data.bytes.len() as isize, mem::transmute(&data.bytes[0]), gl::STATIC_DRAW);
         }
 
         let count;
@@ -391,8 +391,9 @@ impl OpenGLRenderer {
                 let mut ubo: GLuint = 0;
                 gl::GenBuffers(1, &mut ubo);
                 gl::BindBuffer(gl::UNIFORM_BUFFER, ubo);
-                gl::BufferData(gl::UNIFORM_BUFFER, buffer_data.bytes.len() as isize, mem::transmute(&buffer_data.bytes[0]), gl::STATIC_DRAW);
+                gl::BufferData(gl::UNIFORM_BUFFER, buffer_data.bytes.len() as isize, mem::transmute(&buffer_data.bytes[0]), gl::DYNAMIC_DRAW);
                 
+                gl::UniformBlockBinding(progid, i as u32, i as u32);
                 gl::BindBufferBase(gl::UNIFORM_BUFFER, i as u32, ubo);
                 
                 uniform_blocks.push(GLUniformBlock {
