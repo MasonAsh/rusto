@@ -64,11 +64,67 @@ struct GLVertexArrayObject {
     id: GLHandle,
 }
 
+struct GLStateManager {
+    prog: GLHandle,
+    vao: GLHandle,
+    vbo: GLHandle,
+    ibo: GLHandle,
+    ubo: GLHandle,
+}
+
+impl GLStateManager {
+    pub fn new() -> GLStateManager {
+        GLStateManager {
+            prog: 0,
+            vao: 0,
+            vbo: 0,
+            ibo: 0,
+            ubo: 0,
+        }
+    }
+
+    pub fn set_program(&mut self, prog: GLHandle) {
+        if self.prog != prog {
+            self.prog = prog;
+            unsafe { gl::UseProgram(prog); }
+        }
+    }
+
+    pub fn set_vao(&mut self, vao: GLHandle) {
+        if self.vao != vao {
+            self.vao = vao;
+            unsafe { gl::BindVertexArray(vao); }
+        }
+    }
+
+    pub fn set_vbo(&mut self, vbo: GLHandle) {
+        if self.vbo != vbo {
+            self.vbo = vbo;
+            unsafe { gl::BindBuffer(gl::ARRAY_BUFFER, vbo); }
+        }
+    }
+
+    pub fn set_ibo(&mut self, ibo: GLHandle) {
+        if self.ibo != ibo {
+            self.ibo = ibo;
+            unsafe { gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ibo); }
+        }
+    }
+
+    pub fn set_ubo(&mut self, ubo: GLHandle) {
+        if self.ubo != ubo {
+            self.ubo = ubo;
+            unsafe { gl::BindBuffer(gl::UNIFORM_BUFFER, ubo); }
+        }
+    }
+}
+
 pub struct OpenGLRenderer {
     vaos: Vec<GLVertexArrayObject>,
     vbos: Vec<GLVbo>,
     ibos: Vec<GLIbo>,
     progs: Vec<GLProg>,
+    state: GLStateManager,
 }
 
 pub struct OpenGLGeometry {
@@ -101,32 +157,33 @@ impl OpenGLRenderer {
             vbos: Vec::new(),
             ibos: Vec::new(),
             progs: Vec::new(),
+            state: GLStateManager::new(),
         })
     }
 
-    fn bind_vertex_buffer(&self, vboh: VBOHandle) {
-        unsafe {
-            gl::BindBuffer(gl::ARRAY_BUFFER, self.vbos[vboh].id);
-        }
-    }
+    // fn bind_vertex_buffer(&self, vboh: VBOHandle) {
+    //     unsafe {
+    //         gl::BindBuffer(gl::ARRAY_BUFFER, self.vbos[vboh].id);
+    //     }
+    // }
 
-    fn bind_index_buffer(&self, iboh: IBOHandle) {
-        unsafe {
-            gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.ibos[iboh].id);
-        }
-    }
+    // fn bind_index_buffer(&self, iboh: IBOHandle) {
+    //     unsafe {
+    //         gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.ibos[iboh].id);
+    //     }
+    // }
 
-    fn bind_program(&self, progh: ProgramHandle) {
-        unsafe {
-            gl::UseProgram(self.progs[progh].id);
-        }
-    }
+    // fn bind_program(&self, progh: ProgramHandle) {
+    //     unsafe {
+    //         gl::UseProgram(self.progs[progh].id);
+    //     }
+    // }
     
-    fn bind_vertex_array(&self, vaoh: VAOHandle) {
-        unsafe {
-            gl::BindVertexArray(self.vaos[vaoh].id);
-        }
-    }
+    // fn bind_vertex_array(&self, vaoh: VAOHandle) {
+    //     unsafe {
+    //         gl::BindVertexArray(self.vaos[vaoh].id);
+    //     }
+    // }
 
     fn compile_shader(&self, src: &str, shader_type: GLenum) -> GLuint {
         unsafe {
@@ -154,18 +211,19 @@ impl OpenGLRenderer {
         }
     }
 
-    fn create_vertex_array_object(&mut self, desc: &VertexLayoutDescription, vbo: VBOHandle, progh: ProgramHandle) -> Result<VAOHandle, String> {
+    fn create_vertex_array_object(&mut self, desc: &VertexLayoutDescription, vboh: VBOHandle, progh: ProgramHandle) -> Result<VAOHandle, String> {
         let mut vao = 0;
 
         unsafe {
             gl::GenVertexArrays(1, &mut vao);
-            gl::BindVertexArray(vao);
+            self.state.set_vao(vao);
 
-            self.bind_vertex_buffer(vbo);
+            let vboid = self.vbos[vboh].id;
+            self.state.set_vbo(vboid);
 
-            self.bind_program(progh);
-            
             let progid = self.progs[progh].id;
+
+            self.state.set_program(progid);
 
             for (i,elem) in desc.elements.iter().enumerate() {
                 let index = i as u32;
@@ -196,7 +254,8 @@ impl OpenGLRenderer {
 
         unsafe {
             gl::GenBuffers(1, &mut buf_id);
-            gl::BindBuffer(gl::ARRAY_BUFFER, buf_id);
+            //gl::BindBuffer(gl::ARRAY_BUFFER, buf_id);
+            self.state.set_vbo(buf_id);
             gl::BufferData(gl::ARRAY_BUFFER, data.bytes.len() as isize, mem::transmute(&data.bytes[0]), gl::STATIC_DRAW);
         }
 
@@ -214,7 +273,8 @@ impl OpenGLRenderer {
 
         unsafe {
             gl::GenBuffers(1, &mut buf_id);
-            gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, buf_id);
+            //gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, buf_id);
+            self.state.set_ibo(buf_id);
             gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, data.bytes.len() as isize, mem::transmute(&data.bytes[0]), gl::STATIC_DRAW);
         }
 
@@ -306,7 +366,7 @@ impl OpenGLRenderer {
         ShaderParams::new(param_groups)
     }
     
-    fn get_program_uniform_blocks(&self, progid: GLuint) -> Vec<GLUniformBlock> {
+    fn get_program_uniform_blocks(&mut self, progid: GLuint) -> Vec<GLUniformBlock> {
         let mut num_blocks: GLint = 0;
         unsafe { gl::GetProgramiv(progid, gl::ACTIVE_UNIFORM_BLOCKS, &mut num_blocks); }
         
@@ -382,7 +442,8 @@ impl OpenGLRenderer {
 
                 let mut ubo: GLuint = 0;
                 gl::GenBuffers(1, &mut ubo);
-                gl::BindBuffer(gl::UNIFORM_BUFFER, ubo);
+                //gl::BindBuffer(gl::UNIFORM_BUFFER, ubo);
+                self.state.set_ubo(ubo);
                 gl::BufferData(gl::UNIFORM_BUFFER, buffer_data.bytes.len() as isize, mem::transmute(&buffer_data.bytes[0]), gl::DYNAMIC_DRAW);
                 
                 gl::UniformBlockBinding(progid, i as u32, i as u32);
@@ -404,10 +465,14 @@ impl OpenGLRenderer {
     fn draw_vertex_arrays(&mut self, vboh: VBOHandle, vaoh: VAOHandle, iboh: IBOHandle, progh: ProgramHandle) {
         let ibo = &self.ibos[iboh];
 
-        self.bind_program(progh);
-        self.bind_vertex_buffer(vboh);
-        self.bind_index_buffer(iboh);
-        self.bind_vertex_array(vaoh);
+        self.state.set_program(self.progs[progh].id);
+        //self.bind_program(progh);
+        self.state.set_vbo(self.vbos[vboh].id);
+        //self.bind_vertex_buffer(vboh);
+        self.state.set_ibo(self.ibos[iboh].id);
+        //self.bind_index_buffer(iboh);
+        self.state.set_vao(self.vaos[vaoh].id);
+        //self.bind_vertex_array(vaoh);
 
         unsafe {
             gl::DrawArrays(gl::TRIANGLES, 0, ibo.count as i32);
@@ -458,7 +523,8 @@ impl OpenGLRenderer {
         for block_idx in affected_blocks {
             let block = uniform_blocks.get_mut(block_idx).unwrap();
             unsafe {
-                gl::BindBuffer(gl::UNIFORM_BUFFER, block.buffer);
+                //gl::BindBuffer(gl::UNIFORM_BUFFER, block.buffer);
+                self.state.set_ubo(block.buffer);
                 gl::BufferSubData(gl::UNIFORM_BUFFER, 0, block.buffer_data.bytes.len() as isize, mem::transmute(&block.buffer_data.bytes[0]));
             }
         }
