@@ -56,7 +56,7 @@ impl BufferData {
     pub fn update_region<T>(&mut self, start: usize, data: Vec<T>) {
         let inserting_bytes = BufferData::convert_to_bytes(data);
 
-		for (i, byte) in inserting_bytes.iter().enumerate() {
+        for (i, byte) in inserting_bytes.iter().enumerate() {
             self.bytes[start + i] = *byte;
         }
     }

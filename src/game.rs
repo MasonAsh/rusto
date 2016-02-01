@@ -90,7 +90,7 @@ impl Game {
         vdesc.add_element("position".to_string(), VertexElementType::F32F32);
         vdesc.add_element("color".to_string(), VertexElementType::F32F32F32F32);
 
-		let num_tris = 100;
+        let num_tris = 100;
 
         let mut randoms: Vec<f32> = Vec::new();
 
@@ -144,9 +144,9 @@ void main() {
 
         let mut geometry = renderer.create_geometry(vertex_data, index_data, vdesc, IndexType::U32, vert_src, frag_src);
 
-		geometry.update_params(&|params| {
-			params.set("arbitrary_x_offset", ParamValue::F32(0.2));		
-		});
+        geometry.update_params(&|params| {
+            params.set("arbitrary_x_offset", ParamValue::F32(0.2));     
+        });
 
         Game {
             running: true,
@@ -179,12 +179,12 @@ void main() {
     }
 
     fn render(&mut self) {
-    	let time: f32 = (self.sdl.timer().unwrap().ticks() as f32) / 1000.0;
-    	
-    	self.geometry.update_params(&|mut params| {
-    		params.set("time", ParamValue::F32(time))
-    	});
-    	
+        let time: f32 = (self.sdl.timer().unwrap().ticks() as f32) / 1000.0;
+        
+        self.geometry.update_params(&|mut params| {
+            params.set("time", ParamValue::F32(time))
+        });
+        
         self.renderer.clear(1.0, 0.3, 0.3, 1.0);
 
         self.renderer.draw_geometry(&mut self.geometry);

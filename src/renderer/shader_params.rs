@@ -6,25 +6,25 @@ use std::mem;
 use std::collections::HashMap;
 
 pub enum ParamValue {
-	F32(f32),
+    F32(f32),
     Vec4(Vector4<f32>),
     Mat3(Matrix3<f32>),
     Mat4(Matrix4<f32>),
 }
 
 pub struct Param {
-	pub name: String,
-	pub value: ParamValue,
+    pub name: String,
+    pub value: ParamValue,
 }
 
 pub struct ParamGroup {
-	pub name: String,
-	pub params: Vec<Param>,
+    pub name: String,
+    pub params: Vec<Param>,
 }
 
 pub struct ShaderParams {
-	groups: Vec<ParamGroup>,
-	changes: Vec<String>, 
+    groups: Vec<ParamGroup>,
+    changes: Vec<String>, 
 }
 
 impl ShaderParams {
@@ -36,17 +36,17 @@ impl ShaderParams {
     }
     
     fn find_mut_param(&mut self, name: &str) -> Option<&mut Param> {
-    	let mut result: Option<&mut Param> = None;
-    	for group in self.groups.iter_mut() {
-    		for param in group.params.iter_mut() {
-    			if param.name == name {
-    				result = Some(&mut *param);
-    				break;
-    			}
-    		}
-    	}
-    	
-    	result
+        let mut result: Option<&mut Param> = None;
+        for group in self.groups.iter_mut() {
+            for param in group.params.iter_mut() {
+                if param.name == name {
+                    result = Some(&mut *param);
+                    break;
+                }
+            }
+        }
+        
+        result
     }
 
     fn find_param(&self, name: &str) -> Option<&Param> {
@@ -64,11 +64,11 @@ impl ShaderParams {
     }
     
     pub fn set(&mut self, name: &str, value: ParamValue) {
-    	{
-    		let param = self.find_mut_param(name).unwrap();
-    		param.value = value;
-    	}
-		self.changes.push(name.clone().to_string());
+        {
+            let param = self.find_mut_param(name).unwrap();
+            param.value = value;
+        }
+        self.changes.push(name.clone().to_string());
     }
 
     pub fn get(&self, name: &str) -> &ParamValue {
@@ -77,7 +77,7 @@ impl ShaderParams {
     }
     
     pub fn flush_changes(&mut self) -> Vec<String> {
-    	mem::replace(&mut self.changes, Vec::new())
+        mem::replace(&mut self.changes, Vec::new())
     }
 }
 

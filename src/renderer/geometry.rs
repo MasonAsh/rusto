@@ -10,8 +10,8 @@ pub trait Geometry {
     /// Example:
     /// `geometry.update_params(&|params| { params.set("whatever", ParamValue::F32(1.0)) });
     fn update_params(&mut self, closure: &Fn(&mut ShaderParams)) {
-    	let params = self.get_mut_params();
-    	closure(params);
+        let params = self.get_mut_params();
+        closure(params);
     }
 }
 
