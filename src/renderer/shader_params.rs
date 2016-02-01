@@ -3,7 +3,6 @@ extern crate cgmath;
 use self::cgmath::*;
 
 use std::mem;
-use std::collections::HashMap;
 
 pub enum ParamValue {
     F32(f32),

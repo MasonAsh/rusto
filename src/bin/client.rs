@@ -1,10 +1,10 @@
 #[macro_use]
 extern crate rusto;
 
-use rusto::game;
+use rusto::*;
 
 fn main() {
-    let mut my_game = game::Game::new();
+    let mut my_game = Game::new();
 
     my_game.run();
 }

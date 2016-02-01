@@ -35,7 +35,7 @@ struct GLUniform {
     name: String,
     index: GLuint,
     offset: GLint,
-    itype: GLenum,
+    utype: GLenum,
     size: GLsizei,
 }
 
@@ -161,12 +161,6 @@ impl OpenGLRenderer {
             gl::GenVertexArrays(1, &mut vao);
             gl::BindVertexArray(vao);
 
-            let mut vertex_size: i32 = 0;
-
-            for elem in desc.elements.iter() {
-                vertex_size += elem.vtype.get_size_of() as i32;
-            }
-
             self.bind_vertex_buffer(vbo);
 
             self.bind_program(progh);
@@ -183,7 +177,6 @@ impl OpenGLRenderer {
                 
                 let attr_name_cstr = CString::new(elem.name.clone()).unwrap().as_ptr();
                 
-                //let index = gl::GetAttribLocation(progid, attr_name_cstr);
                 gl::BindAttribLocation(progid, index, attr_name_cstr);
                 
                 gl::EnableVertexAttribArray(index as u32);
@@ -290,7 +283,7 @@ impl OpenGLRenderer {
             let mut params: Vec<Param> = Vec::with_capacity(block.uniforms.len());
             
             for uniform in block.uniforms.iter() {
-                let param_value: ParamValue = match uniform.itype {
+                let param_value: ParamValue = match uniform.utype {
                     gl::FLOAT      => ParamValue::F32(0.0),
                     gl::FLOAT_VEC4 => ParamValue::Vec4(vec4(0.0, 0.0, 0.0, 0.0)),
                     gl::FLOAT_MAT3 => ParamValue::Mat3(Matrix3::identity()),
@@ -314,7 +307,6 @@ impl OpenGLRenderer {
     }
     
     fn get_program_uniform_blocks(&self, progid: GLuint) -> Vec<GLUniformBlock> {
-        //let progid = program.id;
         let mut num_blocks: GLint = 0;
         unsafe { gl::GetProgramiv(progid, gl::ACTIVE_UNIFORM_BLOCKS, &mut num_blocks); }
         
@@ -381,7 +373,7 @@ impl OpenGLRenderer {
                         name: uniform_name,
                         index: uniform_index,
                         offset: uniform_offset,
-                        itype: uniform_type,
+                        utype: uniform_type,
                         size: uniform_size,
                     });
                 }
@@ -449,7 +441,7 @@ impl OpenGLRenderer {
                             affected_blocks.push(block_idx);
                         }
 
-                        let mut param_value = params.get(name);
+                        let param_value = params.get(name);
                         match *param_value {
                             ParamValue::F32(x)  => block.buffer_data.update_region(uniform.offset as usize, vec![x]),
                             ParamValue::Vec4(x) => block.buffer_data.update_region(uniform.offset as usize, vec![x]),
@@ -486,7 +478,6 @@ impl Renderer for OpenGLRenderer {
         let prog = self.create_program(vert_src, frag_src).unwrap();
         let vao = self.create_vertex_array_object(&layout, vbo, prog).unwrap();
         let ibo = self.create_index_buffer_object(index_type, index_data).unwrap();
-        //let params = self.get_program_params(prog);
         let params = self.get_shader_params_from_uniforms(&self.progs[prog].uniform_blocks);
 
         let geom = OpenGLGeometry {

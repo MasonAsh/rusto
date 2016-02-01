@@ -31,7 +31,6 @@ impl BufferData {
         }
     }
 
-
     fn convert_to_bytes<T>(data: Vec<T>) -> Vec<u8> {
         let mut result: Vec<u8> = Vec::new();
 

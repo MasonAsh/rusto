@@ -13,5 +13,3 @@ pub fn renderer_factory(renderer_name: &str) -> Result<Box<Renderer>, String> {
         _        => Err(format!("No renderer by the name {}", renderer_name)),
     }
 }
-
-

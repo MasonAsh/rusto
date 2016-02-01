@@ -5,7 +5,6 @@ extern crate rand;
 use std::thread;
 use config::load_config_file;
 use self::rand::random;
-use self::sdl2::timer;
 use self::sdl2::event::{Event};
 
 use renderer::*;
@@ -78,7 +77,7 @@ impl Game {
 
         match window.gl_make_current(&gl_ctx) {
             Ok(_)  => (),
-            Err(x) => panic!(format!("failed to bind window to OpenGL. Reason: {}", x))
+            Err(x) => panic!("failed to bind window to OpenGL. Reason: {}", x)
         }
 
         gl::load_with(|name| vid_ctx.gl_get_proc_address(name) as *const _);
