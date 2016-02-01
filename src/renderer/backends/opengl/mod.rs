@@ -144,10 +144,10 @@ impl OpenGLRenderer {
             if status != (gl::TRUE as GLint) {
                 let mut len = 0;
                 gl::GetShaderiv(shader, gl::INFO_LOG_LENGTH, &mut len);
-                let mut buf: Vec<&[u8]> = Vec::new();
+                let mut buf = Vec::with_capacity(len as usize);
                 buf.set_len((len as usize) - 1);
                 gl::GetShaderInfoLog(shader, len, ptr::null_mut(), buf.as_mut_ptr() as * mut GLchar);
-                panic!("{}", str::from_utf8(&buf[0]).ok().expect("ShaderInfoLog not valid utf8."));
+                panic!("{}", str::from_utf8(&buf).ok().expect("ShaderInfoLog not valid utf8."));
             }
 
             shader
@@ -261,10 +261,10 @@ impl OpenGLRenderer {
             if status != (gl::TRUE as GLint) {
                 let mut len: GLint = 0;
                 gl::GetProgramiv(program, gl::INFO_LOG_LENGTH, &mut len);
-                let mut buf: Vec<&[u8]> = Vec::new();
+                let mut buf = Vec::with_capacity(len as usize);
                 buf.set_len((len as usize) - 1);
                 gl::GetProgramInfoLog(program, len, ptr::null_mut(), buf.as_mut_ptr() as *mut GLchar);
-                panic!("{}", str::from_utf8(&buf[0]).ok().expect("programinfolog not valid utf8"));
+                panic!("{}", str::from_utf8(&buf).ok().expect("programinfolog not valid utf8"));
             }
         }
 
