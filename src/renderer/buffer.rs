@@ -19,6 +19,19 @@ impl BufferData {
         result
     }
 
+    pub fn new_zero_initialized(size: usize) -> BufferData {
+        let mut bytes = Vec::with_capacity(size);
+
+        for _ in 0..size {
+            bytes.push(0);
+        }
+
+        BufferData {
+            bytes: bytes
+        }
+    }
+
+
     fn convert_to_bytes<T>(data: Vec<T>) -> Vec<u8> {
         let mut result: Vec<u8> = Vec::new();
 
@@ -39,5 +52,12 @@ impl BufferData {
 
         self.bytes.extend(bytes);
     }
-}
 
+    pub fn update_region<T>(&mut self, start: usize, data: Vec<T>) {
+        let inserting_bytes = BufferData::convert_to_bytes(data);
+
+		for (i, byte) in inserting_bytes.iter().enumerate() {
+            self.bytes[start + i] = *byte;
+        }
+    }
+}

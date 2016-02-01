@@ -5,6 +5,7 @@ extern crate rand;
 use std::thread;
 use config::load_config_file;
 use self::rand::random;
+use self::sdl2::timer;
 use self::sdl2::event::{Event};
 
 use renderer::*;
@@ -113,7 +114,12 @@ impl Game {
         let index_data = BufferData::new_initialized(index_vec);
 
         let vert_src = r#"
-#version 140
+#version 400
+
+uniform Misc {
+  float time;
+  float arbitrary_x_offset;
+};
 
 in vec2 position;
 in vec4 color;
@@ -121,12 +127,12 @@ out vec4 ocolor;
 
 void main() {
     ocolor = color;
-    gl_Position = vec4(position, 0.0, 1.0);
+    gl_Position = vec4(position.x + arbitrary_x_offset, position.y + sin(time), 0.0, 1.0);
 }
 "#;
 
         let frag_src = r#"
-#version 140
+#version 400
 
 in vec4 ocolor;
 out vec4 color;
@@ -136,7 +142,11 @@ void main() {
 }
 "#;
 
-        let geometry = renderer.create_geometry(vertex_data, index_data, vdesc, IndexType::U32, vert_src, frag_src);
+        let mut geometry = renderer.create_geometry(vertex_data, index_data, vdesc, IndexType::U32, vert_src, frag_src);
+
+		geometry.update_params(&|params| {
+			params.set("arbitrary_x_offset", ParamValue::F32(0.2));		
+		});
 
         Game {
             running: true,
@@ -169,9 +179,15 @@ void main() {
     }
 
     fn render(&mut self) {
+    	let time: f32 = (self.sdl.timer().unwrap().ticks() as f32) / 1000.0;
+    	
+    	self.geometry.update_params(&|mut params| {
+    		params.set("time", ParamValue::F32(time))
+    	});
+    	
         self.renderer.clear(1.0, 0.3, 0.3, 1.0);
 
-        self.renderer.draw_geometry(&self.geometry);
+        self.renderer.draw_geometry(&mut self.geometry);
 
         self.window.gl_swap_window();
     }

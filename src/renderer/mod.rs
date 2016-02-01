@@ -21,9 +21,9 @@ pub trait Renderer {
 //    fn create_index_buffer_object(&mut self, index_type: IndexType, data: BufferData) -> Result<IBOHandle, String>;
 //    fn create_program(&mut self, vert_src: String, pix_src: String) -> Result<ProgramHandle, String>;
 //    fn draw(&mut self, vbos: VBOHandle, ibo: IBOHandle, program: ProgramHandle);
-	fn create_geometry(&mut self, vertex_data: BufferData, index_data: BufferData, layout_desc: VertexLayoutDescription, index_type: IndexType, vert_src: &str, frag_src: &str) -> Box<Geometry>;
+    fn create_geometry(&mut self, vertex_data: BufferData, index_data: BufferData, layout_desc: VertexLayoutDescription, index_type: IndexType, vert_src: &str, frag_src: &str) -> Box<Geometry>;
 
-    fn draw_geometry(&mut self, geom: &Box<Geometry>);
+    fn draw_geometry(&mut self, geom: &mut Box<Geometry>);
 }
 
 pub mod backends;
