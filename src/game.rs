@@ -1,11 +1,16 @@
 extern crate sdl2;
 extern crate gl;
 extern crate rand;
+extern crate image;
+
 
 use std::thread;
+use std::fs::File;
+use std::path::Path;
 use config::load_config_file;
 use self::rand::random;
 use self::sdl2::event::{Event};
+use self::image::GenericImage;
 
 use renderer::*;
 use renderer::backends::{renderer_factory, determine_best_renderer};
@@ -87,70 +92,64 @@ impl Game {
 
         let mut vdesc = VertexLayoutDescription::new();
         vdesc.add_element("position".to_string(), VertexElementType::F32F32);
-        vdesc.add_element("color".to_string(), VertexElementType::F32F32F32F32);
+        vdesc.add_element("tex_coord".to_string(), VertexElementType::F32F32);
 
-        let num_tris = 100;
+        let tri: Vec<f32> = vec![
+            -0.5f32, -0.5,
+            0.0, 0.0,
+            0.0, 0.5,
+            0.5, 1.0,
+            0.5, -0.5,
+            1.0, 0.0,  
+        ];
 
-        let mut randoms: Vec<f32> = Vec::new();
+        let vertex_data = BufferData::new_initialized(tri);
 
-        for _ in 0..(num_tris * 3) {
-            randoms.push(random::<f32>() * 2.0 - 1.0);
-            randoms.push(random::<f32>() * 2.0 - 1.0);
-            randoms.push(random::<f32>());
-            randoms.push(random::<f32>());
-            randoms.push(random::<f32>());
-            randoms.push(random::<f32>());
-        }
-
-        let vertex_data = BufferData::new_initialized(randoms);
-
-        let mut index_vec: Vec<u32> = Vec::new();
-
-        for i in 0..num_tris*3 {
-            index_vec.push(i as u32);
-        }
+        let index_vec: Vec<u32> = vec![
+            1, 0, 2
+        ];
 
         let index_data = BufferData::new_initialized(index_vec);
 
         let vert_src = r#"
 #version 400
 
-uniform Misc {
-  float time;
-  float arbitrary_x_offset;
-};
-
-uniform DoMultipleBuffersWork {
-  float yes;
-};
-
 in vec2 position;
-in vec4 color;
-out vec4 ocolor;
+in vec2 tex_coord;
+out vec2 frag_tex_coord;
 
 void main() {
-    ocolor = color;
-    gl_Position = vec4(position.x + arbitrary_x_offset + yes, position.y + sin(time), 0.0, 1.0);
+    frag_tex_coord = tex_coord;
+    gl_Position = vec4(position.x, position.y, 0.0, 1.0);
 }
 "#;
 
         let frag_src = r#"
 #version 400
 
-in vec4 ocolor;
+uniform sampler2D tex;
+uniform sampler2D tex2;
+
+in vec2 frag_tex_coord;
 out vec4 color;
 
 void main() {
-    color = ocolor;
+    color = texture(tex, frag_tex_coord);
+    color = color * texture(tex2, frag_tex_coord);
 }
 "#;
 
+        let img = image::open(&Path::new("data/test.bmp")).unwrap();
+        let img2 = image::open(&Path::new("data/test2.bmp")).unwrap();
+
+        let texture = renderer.create_texture_from_image(&img);
+        let texture2 = renderer.create_texture_from_image(&img2);
         let mut geometry = renderer.create_geometry(vertex_data, index_data, vdesc, IndexType::U32, vert_src, frag_src);
 
-        geometry.update_params(&|params| {
-            params.set("arbitrary_x_offset", ParamValue::F32(0.2));
-            params.set("yes", ParamValue::F32(-0.2));
-        });
+         geometry.update_params(&|params| {
+            params.set("tex", ParamValue::Texture2D(texture.param_handle()));
+            params.set("tex2", ParamValue::Texture2D(texture2.param_handle())); 
+         });
 
         Game {
             running: true,
@@ -183,12 +182,6 @@ void main() {
     }
 
     fn render(&mut self) {
-        let time: f32 = (self.sdl.timer().unwrap().ticks() as f32) / 1000.0;
-        
-        self.geometry.update_params(&|mut params| {
-            params.set("time", ParamValue::F32(time))
-        });
-        
         self.renderer.clear(1.0, 0.3, 0.3, 1.0);
 
         self.renderer.draw_geometry(&mut self.geometry);

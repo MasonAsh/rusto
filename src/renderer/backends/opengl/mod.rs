@@ -1,5 +1,6 @@
 extern crate gl;
 extern crate cgmath;
+extern crate image;
 
 use super::super::*;
 
@@ -7,10 +8,14 @@ use std::mem;
 use std::ptr;
 use std::ffi::CString;
 use std::str;
+use std::collections::HashMap;
+use std::collections::hash_map::Entry::{Occupied, Vacant};
 
 use self::gl::types::*;
 
 use self::cgmath::*;
+
+use self::image::{GenericImage, DynamicImage};
 
 type GLHandle = u32;
 
@@ -53,11 +58,18 @@ impl PartialEq for GLUniformBlock {
     }
 }
 
+struct GLSampler2D {
+    uniform_info: GLUniform,
+    tex_unit: u32,
+    tex_id: GLuint,
+}
+
 struct GLProg {
     id: GLHandle,
     vsid: GLHandle,
     fsid: GLHandle,
     uniform_blocks: Vec<GLUniformBlock>,
+    sampler2ds: Vec<GLSampler2D>,
 }
 
 struct GLVertexArrayObject {
@@ -70,6 +82,7 @@ struct GLStateManager {
     vbo: GLHandle,
     ibo: GLHandle,
     ubo: GLHandle,
+    tex_units: HashMap<u32, GLuint>
 }
 
 impl GLStateManager {
@@ -80,6 +93,7 @@ impl GLStateManager {
             vbo: 0,
             ibo: 0,
             ubo: 0,
+            tex_units: HashMap::new(),
         }
     }
 
@@ -117,14 +131,52 @@ impl GLStateManager {
             unsafe { gl::BindBuffer(gl::UNIFORM_BUFFER, ubo); }
         }
     }
+
+    pub fn set_tex2d(&mut self, tex_unit_i: u32, tex2d: GLuint) {
+        unsafe {
+            let mut bind = false;
+            
+            match self.tex_units.entry(tex_unit_i) {
+                Vacant(entry) => { 
+                    entry.insert(tex2d);
+                    bind = true;
+                },
+                Occupied(mut entry) => {
+                    let oldvalue = entry.insert(tex2d);
+                    if oldvalue != tex2d {
+                        bind = true;
+                    }
+                },
+            }
+            
+            if bind {
+                gl::ActiveTexture(gl::TEXTURE0 + tex_unit_i);
+                gl::BindTexture(gl::TEXTURE_2D, tex2d);
+            }
+        }
+    }
 }
 
-pub struct OpenGLRenderer {
-    vaos: Vec<GLVertexArrayObject>,
-    vbos: Vec<GLVbo>,
-    ibos: Vec<GLIbo>,
-    progs: Vec<GLProg>,
-    state: GLStateManager,
+pub struct OpenGLTexture {
+    id: GLHandle,
+    filter_method: FilteringMethod,
+    filter_changed: bool,
+    texture_format: TextureFormat,
+}
+
+impl Texture for OpenGLTexture {
+    fn param_handle(&self) -> TextureParamHandle {
+        self.id
+    }
+    
+    fn format(&self) -> &TextureFormat {
+        &self.texture_format
+    }
+    
+    fn set_filtering_method(&mut self, method: FilteringMethod) {
+        self.filter_method = method;
+        self.filter_changed = true;
+    }
 }
 
 pub struct OpenGLGeometry {
@@ -150,6 +202,14 @@ impl Geometry for OpenGLGeometry {
     }
 }
 
+pub struct OpenGLRenderer {
+    vaos: Vec<GLVertexArrayObject>,
+    vbos: Vec<GLVbo>,
+    ibos: Vec<GLIbo>,
+    progs: Vec<GLProg>,
+    state: GLStateManager,
+}
+
 impl OpenGLRenderer {
     pub fn new() -> Box<OpenGLRenderer> {
         Box::new(OpenGLRenderer {
@@ -160,30 +220,6 @@ impl OpenGLRenderer {
             state: GLStateManager::new(),
         })
     }
-
-    // fn bind_vertex_buffer(&self, vboh: VBOHandle) {
-    //     unsafe {
-    //         gl::BindBuffer(gl::ARRAY_BUFFER, self.vbos[vboh].id);
-    //     }
-    // }
-
-    // fn bind_index_buffer(&self, iboh: IBOHandle) {
-    //     unsafe {
-    //         gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.ibos[iboh].id);
-    //     }
-    // }
-
-    // fn bind_program(&self, progh: ProgramHandle) {
-    //     unsafe {
-    //         gl::UseProgram(self.progs[progh].id);
-    //     }
-    // }
-    
-    // fn bind_vertex_array(&self, vaoh: VAOHandle) {
-    //     unsafe {
-    //         gl::BindVertexArray(self.vaos[vaoh].id);
-    //     }
-    // }
 
     fn compile_shader(&self, src: &str, shader_type: GLenum) -> GLuint {
         unsafe {
@@ -225,6 +261,11 @@ impl OpenGLRenderer {
 
             self.state.set_program(progid);
 
+			let mut stride: GLsizei = 0;
+			for elem in desc.elements.iter() {
+				stride += elem.vtype.get_size_of() as i32;
+			}
+
             for (i,elem) in desc.elements.iter().enumerate() {
                 let index = i as u32;
                 let num_components = elem.vtype.get_num_components();
@@ -238,7 +279,7 @@ impl OpenGLRenderer {
                 gl::BindAttribLocation(progid, index, attr_name_cstr);
                 
                 gl::EnableVertexAttribArray(index as u32);
-                gl::VertexAttribPointer(index as u32, num_components, elem_type, gl::FALSE, 0, mem::transmute(elem.offset));
+                gl::VertexAttribPointer(index as u32, num_components, elem_type, gl::FALSE, stride, mem::transmute(elem.offset));
             }
         }
 
@@ -254,7 +295,6 @@ impl OpenGLRenderer {
 
         unsafe {
             gl::GenBuffers(1, &mut buf_id);
-            //gl::BindBuffer(gl::ARRAY_BUFFER, buf_id);
             self.state.set_vbo(buf_id);
             gl::BufferData(gl::ARRAY_BUFFER, data.bytes.len() as isize, mem::transmute(&data.bytes[0]), gl::STATIC_DRAW);
         }
@@ -273,7 +313,6 @@ impl OpenGLRenderer {
 
         unsafe {
             gl::GenBuffers(1, &mut buf_id);
-            //gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, buf_id);
             self.state.set_ibo(buf_id);
             gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, data.bytes.len() as isize, mem::transmute(&data.bytes[0]), gl::STATIC_DRAW);
         }
@@ -322,12 +361,14 @@ impl OpenGLRenderer {
         }
 
         let uniform_blocks = self.get_program_uniform_blocks(program);
+        let sampler2ds = self.get_program_samplers(program);
 
         let prog = GLProg {
             vsid: vs,
             fsid: fs,
             id: program,
             uniform_blocks: uniform_blocks,
+            sampler2ds: sampler2ds,
         };
 
         self.progs.push(prog);
@@ -335,7 +376,7 @@ impl OpenGLRenderer {
         Ok(self.progs.len() - 1)
     }
     
-    fn get_shader_params_from_uniforms(&self, uniform_blocks: &Vec<GLUniformBlock>) -> ShaderParams {
+    fn get_shader_params(&self, uniform_blocks: &Vec<GLUniformBlock>, samplers: &Vec<GLSampler2D>) -> ShaderParams {
         let mut param_groups: Vec<ParamGroup> = Vec::with_capacity(uniform_blocks.len());
 
         for block in uniform_blocks.iter() {
@@ -362,8 +403,61 @@ impl OpenGLRenderer {
                 params: params,
             });
         }
+        
+        let tex_group_name = "_textures".to_string();
+        let mut tex_params: Vec<Param> = Vec::with_capacity(samplers.len());
+        
+        for sampler in samplers.iter() {
+            tex_params.push(Param {
+                name: sampler.uniform_info.name.clone(),
+                value: ParamValue::Texture2D(0),
+            });
+        }
+        
+        param_groups.push(ParamGroup {
+            name: tex_group_name,
+            params: tex_params, 
+        });
 
         ShaderParams::new(param_groups)
+    }
+    
+    fn get_uniform_info(&self, progid: GLuint, uniform_index: u32) -> GLUniform {
+        unsafe {
+            let mut max_uniform_name_len: GLint = 0;
+            gl::GetProgramiv(progid, gl::ACTIVE_UNIFORM_MAX_LENGTH, &mut max_uniform_name_len);
+            
+            let mut name_len: GLsizei = 0;
+            let mut uniform_name_bytes = Vec::with_capacity(max_uniform_name_len as usize);
+            uniform_name_bytes.set_len(max_uniform_name_len as usize);
+            let mut uniform_type: GLenum = 0;
+            let mut uniform_size: GLint = 0;
+            
+            gl::GetActiveUniform(progid,
+                                uniform_index as u32,
+                                max_uniform_name_len,
+                                &mut name_len,
+                                &mut uniform_size,
+                                &mut uniform_type,
+                                uniform_name_bytes.as_mut_ptr() as *mut GLchar);
+            
+            for _ in 0..(max_uniform_name_len - name_len) {
+                uniform_name_bytes.pop();
+            }
+
+            let uniform_name: String = str::from_utf8(&uniform_name_bytes).unwrap().to_string();
+            
+            let mut uniform_offset: GLint = 0;
+            gl::GetActiveUniformsiv(progid, 1, &uniform_index, gl::UNIFORM_OFFSET, &mut uniform_offset);
+            
+            GLUniform {
+                name: uniform_name,
+                index: uniform_index,
+                offset: uniform_offset,
+                utype: uniform_type,
+                size: uniform_size,
+            }
+        }
     }
     
     fn get_program_uniform_blocks(&mut self, progid: GLuint) -> Vec<GLUniformBlock> {
@@ -405,44 +499,15 @@ impl OpenGLRenderer {
                 let mut uniforms: Vec<GLUniform> = Vec::with_capacity(num_uniforms as usize);
                 
                 for uniform_index in uniform_indices {
-                    let mut name_len: GLsizei = 0;
-                    let mut uniform_name_bytes = Vec::with_capacity(max_uniform_name_len as usize);
-                    uniform_name_bytes.set_len(max_uniform_name_len as usize);
-                    let mut uniform_type: GLenum = 0;
-                    let mut uniform_size: GLint = 0;
+                    let uniform = self.get_uniform_info(progid, uniform_index);
                     
-                    gl::GetActiveUniform(progid,
-                                         uniform_index as u32,
-                                         max_uniform_name_len,
-                                         &mut name_len,
-                                         &mut uniform_size,
-                                         &mut uniform_type,
-                                         uniform_name_bytes.as_mut_ptr() as *mut GLchar);
-                    
-                    for _ in 0..(max_uniform_name_len - name_len) {
-                        uniform_name_bytes.pop();
-                    }
-    
-                    let uniform_name: String = str::from_utf8(&uniform_name_bytes).unwrap().to_string();
-                    
-                    let mut uniform_offset: GLint = 0;
-                    gl::GetActiveUniformsiv(progid, 1, &uniform_index, gl::UNIFORM_OFFSET, &mut uniform_offset);
-
-                    
-                    uniforms.push(GLUniform {
-                        name: uniform_name,
-                        index: uniform_index,
-                        offset: uniform_offset,
-                        utype: uniform_type,
-                        size: uniform_size,
-                    });
+                    uniforms.push(uniform);
                 }
 
                 let buffer_data = BufferData::new_zero_initialized(block_size as usize);
 
                 let mut ubo: GLuint = 0;
                 gl::GenBuffers(1, &mut ubo);
-                //gl::BindBuffer(gl::UNIFORM_BUFFER, ubo);
                 self.state.set_ubo(ubo);
                 gl::BufferData(gl::UNIFORM_BUFFER, buffer_data.bytes.len() as isize, mem::transmute(&buffer_data.bytes[0]), gl::DYNAMIC_DRAW);
                 
@@ -461,21 +526,61 @@ impl OpenGLRenderer {
             uniform_blocks
         }
     }
+    
+    fn get_program_samplers(&self, progid: GLHandle) -> Vec<GLSampler2D> {
+        let mut num_uniforms: GLint = 0;
+        
+        unsafe {
+            gl::GetProgramiv(progid, gl::ACTIVE_UNIFORMS, &mut num_uniforms);
+        }
+        
+        let mut samplers = Vec::new();
+        
+        for i in 0..num_uniforms {
+            let mut utype: GLint = 0;
+            
+            unsafe {
+                gl::GetActiveUniformsiv(progid, 1, &(i as u32) as *const u32, gl::UNIFORM_TYPE, &mut utype);
+            }
+            
+            match utype as u32 {
+                gl::SAMPLER_2D => {
+                    let uniform_info = self.get_uniform_info(progid, i as u32);
+                    let tex_unit = samplers.len() as u32;
+                    
+                    samplers.push(GLSampler2D {
+                       uniform_info: uniform_info,
+                       tex_unit: tex_unit,
+                       tex_id: 0, 
+                    });
+                },
+                _ => continue,
+            }
+        }
+        
+        samplers
+    }
 
     fn draw_vertex_arrays(&mut self, vboh: VBOHandle, vaoh: VAOHandle, iboh: IBOHandle, progh: ProgramHandle) {
         let ibo = &self.ibos[iboh];
+        let prog = &self.progs[progh];
 
         self.state.set_program(self.progs[progh].id);
-        //self.bind_program(progh);
         self.state.set_vbo(self.vbos[vboh].id);
-        //self.bind_vertex_buffer(vboh);
         self.state.set_ibo(self.ibos[iboh].id);
-        //self.bind_index_buffer(iboh);
         self.state.set_vao(self.vaos[vaoh].id);
-        //self.bind_vertex_array(vaoh);
+        
+        for sampler in prog.sampler2ds.iter() {
+            self.state.set_tex2d(sampler.tex_unit, sampler.tex_id);
+        }
+
+        let gl_itype = match ibo.itype {
+            IndexType::U16 => gl::UNSIGNED_SHORT,
+            IndexType::U32 => gl::UNSIGNED_INT,
+        };
 
         unsafe {
-            gl::DrawArrays(gl::TRIANGLES, 0, ibo.count as i32);
+            gl::DrawElements(gl::TRIANGLES, ibo.count as i32, gl_itype, ptr::null());
         }
     }
 
@@ -491,6 +596,8 @@ impl OpenGLRenderer {
         let mut uniform_blocks: &mut Vec<GLUniformBlock> = &mut prog.uniform_blocks;
         let mut affected_blocks: Vec<usize> = Vec::new();
 
+		self.state.set_program(prog.id);
+
         let params = geom.get_mut_params();
 
         // This is O(scary)
@@ -499,6 +606,19 @@ impl OpenGLRenderer {
         // are affected as well as the parameters within that where
         // affected, so that we can avoid this
         for name in changes.iter() {
+            match *params.get(name) {
+                ParamValue::Texture2D(tex_handle) => {
+                    for sampler in prog.sampler2ds.iter_mut() {
+                        if sampler.uniform_info.name == *name {
+                            sampler.tex_id = tex_handle;
+                            unsafe { gl::Uniform1i(sampler.uniform_info.index as i32, sampler.tex_unit as i32); }
+                            break;
+                        }
+                    }
+                },
+                _ => (),
+            }
+            
             'outer: for (block_idx, block) in uniform_blocks.iter_mut().enumerate() {
                 for uniform in block.uniforms.iter() {
                     if uniform.name == *name {
@@ -512,6 +632,7 @@ impl OpenGLRenderer {
                             ParamValue::Vec4(x) => block.buffer_data.update_region(uniform.offset as usize, vec![x]),
                             ParamValue::Mat3(x) => block.buffer_data.update_region(uniform.offset as usize, vec![x]),
                             ParamValue::Mat4(x) => block.buffer_data.update_region(uniform.offset as usize, vec![x]),
+                            ParamValue::Texture2D(x) => (),
                         }
 
                         break 'outer;
@@ -523,7 +644,6 @@ impl OpenGLRenderer {
         for block_idx in affected_blocks {
             let block = uniform_blocks.get_mut(block_idx).unwrap();
             unsafe {
-                //gl::BindBuffer(gl::UNIFORM_BUFFER, block.buffer);
                 self.state.set_ubo(block.buffer);
                 gl::BufferSubData(gl::UNIFORM_BUFFER, 0, block.buffer_data.bytes.len() as isize, mem::transmute(&block.buffer_data.bytes[0]));
             }
@@ -538,13 +658,56 @@ impl Renderer for OpenGLRenderer {
             gl::Clear(gl::COLOR_BUFFER_BIT);
         }
     }
+    
+    fn create_texture_from_image(&mut self, image_data: &DynamicImage) -> Box<Texture> {
+        unsafe {
+            let mut tex_id: GLHandle = 0;
+            gl::GenTextures(1, &mut tex_id);
+            
+            self.state.set_tex2d(0, tex_id);
+            
+            let tex_format = match *image_data {
+                DynamicImage::ImageLuma8(_) => TextureFormat::Luminance,
+                DynamicImage::ImageLumaA8(_) => TextureFormat::LuminanceAlpha,
+                DynamicImage::ImageRgb8(_) => TextureFormat::RGB,
+                DynamicImage::ImageRgba8(_) => TextureFormat::RGBA,
+            };
+            
+            let gl_tex_format = match tex_format {
+                TextureFormat::Luminance => gl::RED,
+                TextureFormat::LuminanceAlpha => gl::RG,
+                TextureFormat::RGB => gl::RGB,
+                TextureFormat::RGBA => gl::RGBA,
+                TextureFormat::Alpha => gl::ALPHA,
+            };
+            
+            let (width, height) = image_data.dimensions();
+            
+            let mut raw_pixels = image_data.raw_pixels();
+            
+            gl::TexImage2D(gl::TEXTURE_2D, 0, gl_tex_format as i32, width as i32, height as i32, 0, gl_tex_format, gl::UNSIGNED_BYTE, raw_pixels.as_mut_ptr() as *mut GLvoid);
+            
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
+            
+            Box::new(OpenGLTexture {
+               id: tex_id,
+               filter_method: FilteringMethod::Nearest,
+               filter_changed: false,
+               texture_format: tex_format,
+            })
+        }
+    }
 
     fn create_geometry(&mut self, vertex_data: BufferData, index_data: BufferData, layout: VertexLayoutDescription, index_type: IndexType, vert_src: &str, frag_src: &str) -> Box<Geometry> {
         let vbo = self.create_vertex_buffer_object(vertex_data).unwrap();
         let prog = self.create_program(vert_src, frag_src).unwrap();
         let vao = self.create_vertex_array_object(&layout, vbo, prog).unwrap();
         let ibo = self.create_index_buffer_object(index_type, index_data).unwrap();
-        let params = self.get_shader_params_from_uniforms(&self.progs[prog].uniform_blocks);
+        
+        let uniform_blocks = &self.progs[prog].uniform_blocks;
+        let samplers = &self.progs[prog].sampler2ds;
+        let params = self.get_shader_params(uniform_blocks, samplers);
 
         let geom = OpenGLGeometry {
             vbo: vbo,

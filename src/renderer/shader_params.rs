@@ -2,6 +2,8 @@ extern crate cgmath;
 
 use self::cgmath::*;
 
+use super::texture::TextureParamHandle;
+
 use std::mem;
 
 pub enum ParamValue {
@@ -9,6 +11,7 @@ pub enum ParamValue {
     Vec4(Vector4<f32>),
     Mat3(Matrix3<f32>),
     Mat4(Matrix4<f32>),
+    Texture2D(TextureParamHandle),
 }
 
 pub struct Param {
