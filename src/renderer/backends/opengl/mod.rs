@@ -1,7 +1,3 @@
-extern crate gl;
-extern crate cgmath;
-extern crate image;
-
 use super::super::*;
 
 use std::mem;
@@ -11,11 +7,13 @@ use std::str;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 
-use self::gl::types::*;
+use gl;
 
-use self::cgmath::*;
+use gl::types::*;
 
-use self::image::{GenericImage, DynamicImage};
+use cgmath::*;
+
+use image::{GenericImage, DynamicImage};
 
 type GLHandle = u32;
 

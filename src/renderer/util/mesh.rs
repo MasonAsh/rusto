@@ -1,10 +1,7 @@
-extern crate assimp;
-extern crate cgmath;
-
-use self::assimp::Importer;
-use self::cgmath::Vector2;
-use self::cgmath::Vector3;
-use self::cgmath::Vector4;
+use assimp::Importer;
+use cgmath::Vector2;
+use cgmath::Vector3;
+use cgmath::Vector4;
 
 use std::path::Path;
 

@@ -1,5 +1,3 @@
-extern crate byteorder;
-
 use std::mem;
 
 pub struct BufferData {

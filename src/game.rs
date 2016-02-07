@@ -1,21 +1,16 @@
-extern crate sdl2;
-extern crate gl;
-extern crate rand;
-extern crate image;
-extern crate cgmath;
-
 use std::thread;
 use std::fs::File;
 use std::path::Path;
 use config::load_config_file;
-use self::rand::random;
-use self::sdl2::event::{Event};
-use self::image::GenericImage;
-use self::cgmath::Vector3;
-use self::cgmath::{Matrix4, Matrix};
-use self::cgmath::perspective;
-use self::cgmath::deg;
-use self::cgmath::Point3;
+use sdl2;
+use sdl2::event::{Event};
+use gl;
+use image::GenericImage;
+use cgmath::Vector3;
+use cgmath::{Matrix4, Matrix};
+use cgmath::perspective;
+use cgmath::deg;
+use cgmath::Point3;
 
 use renderer::*;
 use renderer::backends::{renderer_factory, determine_best_renderer};

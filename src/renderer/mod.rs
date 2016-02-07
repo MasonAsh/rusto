@@ -1,5 +1,3 @@
-extern crate image;
-
 pub mod vertex_layout;
 pub mod buffer;
 pub mod geometry;
@@ -13,7 +11,7 @@ pub use self::geometry::*;
 pub use self::texture::*;
 pub use self::shader_params::*;
 
-use self::image::DynamicImage;
+use image::DynamicImage;
 
 pub enum IndexType {
     U16,

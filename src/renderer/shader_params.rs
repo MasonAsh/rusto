@@ -1,6 +1,4 @@
-extern crate cgmath;
-
-use self::cgmath::*;
+use cgmath::*;
 
 use super::texture::TextureParamHandle;
 
