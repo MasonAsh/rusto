@@ -11,6 +11,7 @@ use image::GenericImage;
 use renderer::*;
 use renderer::backends::{renderer_factory, determine_best_renderer};
 use renderer::util::mesh::{MeshOptions, load_meshes_from_file};
+use scene::{Scene, Node, NodeRef, SceneComponent};
 
 use common::*;
 
@@ -21,8 +22,8 @@ pub struct Game {
     events: sdl2::EventPump,
     vid_ctx: sdl2::VideoSubsystem,
     gl_ctx: sdl2::video::GLContext,
-    renderer: Box<Renderer>,
-    geometry: Box<Geometry>,
+    scene: Scene,
+    sphere: NodeRef,
 }
 
 impl Game {
@@ -87,77 +88,15 @@ impl Game {
         gl::load_with(|name| vid_ctx.gl_get_proc_address(name) as *const _);
 
         let renderer_name = determine_best_renderer();
-        let mut renderer = renderer_factory(&renderer_name).unwrap();
+        let renderer = renderer_factory(&renderer_name).unwrap();
 
-        let mesh_data = load_meshes_from_file(&Path::new("data/sphere.obj"), &MeshOptions::default()).unwrap();
+        let mut scene = Scene::new(renderer, width as f32 / height as f32);
         
-        let vdesc = &mesh_data[0].layout;
-        let vertex_data = &mesh_data[0].vertex_data;
-        let index_data = &mesh_data[0].index_data;
-
-        let vert_src = r#"
-#version 400
-
-uniform Matrices {
-    mat4 view;
-    mat4 projection;
-};
-
-in vec3 position;
-in vec3 normal;
-in vec2 tex_coord;
-out vec3 frag_position;
-out vec3 frag_normal;
-out vec2 frag_tex_coord;
-
-void main() {
-    vec4 final_position;
-    final_position = projection * view * vec4(position, 1.0);
-    frag_position = final_position.xyz;
-    frag_normal = normal;
-    frag_tex_coord = tex_coord;
-    gl_Position = final_position;
-}
-"#;
-
-        let frag_src = r#"
-#version 400
-
-uniform sampler2D tex;
-
-in vec3 frag_position;
-in vec3 frag_normal;
-in vec2 frag_tex_coord;
-out vec4 color;
-
-void main() {
-    //color = vec4(frag_normal, 1.0);
-    //color = color * texture(tex, frag_tex_coord);
-    color = texture(tex, frag_tex_coord);
-}
-"#;
-
-        let mut geometry = renderer.create_geometry(vertex_data, index_data, vdesc, IndexType::U32, vert_src, frag_src);
-
-        let img = image::open(&Path::new("data/test.bmp")).unwrap();
-        let tex = renderer.create_texture_from_image(&img);
-
-        geometry.update_params(&|params| {
-            let eye = Point3f::new(0f32, 0f32, 5f32);
-			let pos = Point3f::new(0f32, 0f32, 0f32);
-			let up = Vec3f::new(0f32, 1f32, 0f32);
-            
-            params.set("view", ParamValue::Mat4(
-               	Matrix4::look_at(eye, pos, up)
-            ));
-            params.set("projection", ParamValue::Mat4(
-                perspective(deg(65f32), width as f32 / height as f32, 0.1f32, 1000f32) 
-            ));
-            
-            params.set("tex", ParamValue::Texture2D(
-                tex.param_handle(), 
-            ));
+        let mut node = scene.new_child_node("sphere");
+        node.borrow_mut().transform_change(&|transform| {
+        	transform.position = Vec3f::new(0f32, 0f32, -2f32);		
         });
+        scene.attach_model_component_from_file(&node, &Path::new("data/sphere.obj"));
 
         Game {
             running: true,
@@ -166,8 +105,8 @@ void main() {
             events: events,
             vid_ctx: vid_ctx,
             gl_ctx: gl_ctx,
-            renderer: renderer,
-            geometry: geometry,
+            scene: scene,
+            sphere: node,
         }
     }
 
@@ -190,9 +129,11 @@ void main() {
     }
 
     fn render(&mut self) {
-        self.renderer.clear(1.0, 0.3, 0.3, 1.0);
-
-        self.renderer.draw_geometry(&mut self.geometry);
+    	self.sphere.borrow_mut().transform_change(&|transform| {
+    		transform.position.z += -0.1f32;
+    	});
+    	
+        self.scene.frame();
 
         self.window.gl_swap_window();
     }
