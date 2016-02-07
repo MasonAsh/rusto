@@ -290,7 +290,7 @@ impl OpenGLRenderer {
         Ok(self.vaos.len() - 1)
     }
 
-    fn create_vertex_buffer_object(&mut self, data: BufferData) -> Result<VBOHandle, String> {
+    fn create_vertex_buffer_object(&mut self, data: &BufferData) -> Result<VBOHandle, String> {
         let mut buf_id = 0;
 
         unsafe {
@@ -308,7 +308,7 @@ impl OpenGLRenderer {
         Ok(self.vbos.len() - 1)
     }
 
-    fn create_index_buffer_object(&mut self, itype: IndexType, data: BufferData) -> Result<IBOHandle, String> {
+    fn create_index_buffer_object(&mut self, itype: IndexType, data: &BufferData) -> Result<IBOHandle, String> {
         let mut buf_id = 0;
 
         unsafe {
@@ -699,7 +699,7 @@ impl Renderer for OpenGLRenderer {
         }
     }
 
-    fn create_geometry(&mut self, vertex_data: BufferData, index_data: BufferData, layout: VertexLayoutDescription, index_type: IndexType, vert_src: &str, frag_src: &str) -> Box<Geometry> {
+    fn create_geometry(&mut self, vertex_data: &BufferData, index_data: &BufferData, layout: &VertexLayoutDescription, index_type: IndexType, vert_src: &str, frag_src: &str) -> Box<Geometry> {
         let vbo = self.create_vertex_buffer_object(vertex_data).unwrap();
         let prog = self.create_program(vert_src, frag_src).unwrap();
         let vao = self.create_vertex_array_object(&layout, vbo, prog).unwrap();
@@ -714,7 +714,7 @@ impl Renderer for OpenGLRenderer {
             vao: vao,
             ibo: ibo,
             program: prog,
-            layout_desc: layout,
+            layout_desc: layout.clone(),
             params: params
         };
 

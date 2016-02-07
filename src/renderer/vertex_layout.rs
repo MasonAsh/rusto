@@ -1,5 +1,6 @@
 use std::mem::size_of;
 
+#[derive(Clone)]
 pub enum VertexElementType {
     F32,
     F32F32,
@@ -31,12 +32,14 @@ impl VertexElementType {
     }
 }
 
+#[derive(Clone)]
 pub struct VertexElement {
     pub vtype: VertexElementType,
     pub name: String,
     pub offset: usize,
 }
 
+#[derive(Clone)]
 pub struct VertexLayoutDescription {
     pub elements: Vec<VertexElement>
 }

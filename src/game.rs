@@ -2,7 +2,7 @@ extern crate sdl2;
 extern crate gl;
 extern crate rand;
 extern crate image;
-
+extern crate cgmath;
 
 use std::thread;
 use std::fs::File;
@@ -11,9 +11,15 @@ use config::load_config_file;
 use self::rand::random;
 use self::sdl2::event::{Event};
 use self::image::GenericImage;
+use self::cgmath::Vector3;
+use self::cgmath::{Matrix4, Matrix};
+use self::cgmath::perspective;
+use self::cgmath::deg;
+use self::cgmath::Point3;
 
 use renderer::*;
 use renderer::backends::{renderer_factory, determine_best_renderer};
+use renderer::util::mesh::{MeshOptions, load_meshes_from_file};
 
 pub struct Game {
     running: bool,
@@ -90,65 +96,82 @@ impl Game {
         let renderer_name = determine_best_renderer();
         let mut renderer = renderer_factory(&renderer_name).unwrap();
 
-        let mut vdesc = VertexLayoutDescription::new();
-        vdesc.add_element("position".to_string(), VertexElementType::F32F32);
-        vdesc.add_element("tex_coord".to_string(), VertexElementType::F32F32);
+        // let mut vdesc = VertexLayoutDescription::new();
+        // vdesc.add_element("position".to_string(), VertexElementType::F32F32);
+        // vdesc.add_element("tex_coord".to_string(), VertexElementType::F32F32);
 
-        let tri: Vec<f32> = vec![
-            -0.5f32, -0.5,
-            0.0, 0.0,
-            0.0, 0.5,
-            0.5, 1.0,
-            0.5, -0.5,
-            1.0, 0.0,  
-        ];
+        // let tri: Vec<f32> = vec![
+        //     -0.5f32, -0.5,
+        //     0.0, 0.0,
+        //     0.0, 0.5,
+        //     0.5, 1.0,
+        //     0.5, -0.5,
+        //     1.0, 0.0,  
+        // ];
 
-        let vertex_data = BufferData::new_initialized(tri);
+        // let vertex_data = BufferData::new_initialized(tri);
 
-        let index_vec: Vec<u32> = vec![
-            1, 0, 2
-        ];
+        // let index_vec: Vec<u32> = vec![
+        //     1, 0, 2
+        // ];
 
-        let index_data = BufferData::new_initialized(index_vec);
+        // let index_data = BufferData::new_initialized(index_vec);
+
+        let mesh_data = load_meshes_from_file(&Path::new("data/sphere.obj"), &MeshOptions::default()).unwrap();
+        
+        let vdesc = &mesh_data[0].layout;
+        let vertex_data = &mesh_data[0].vertex_data;
+        let index_data = &mesh_data[0].index_data;
 
         let vert_src = r#"
 #version 400
 
-in vec2 position;
-in vec2 tex_coord;
-out vec2 frag_tex_coord;
+uniform Matrices {
+    mat4 view;
+    mat4 projection;
+};
+
+in vec3 position;
+in vec3 normal;
+out vec3 frag_position;
+out vec3 frag_normal;
 
 void main() {
-    frag_tex_coord = tex_coord;
-    gl_Position = vec4(position.x, position.y, 0.0, 1.0);
+    vec4 final_position;
+    final_position = projection * view * vec4(position, 1.0);
+    frag_position = final_position.xyz;
+    frag_normal = normal;
+    gl_Position = final_position;
 }
 "#;
 
         let frag_src = r#"
 #version 400
 
-uniform sampler2D tex;
-uniform sampler2D tex2;
-
-in vec2 frag_tex_coord;
+in vec3 frag_position;
+in vec3 frag_normal;
 out vec4 color;
 
 void main() {
-    color = texture(tex, frag_tex_coord);
-    color = color * texture(tex2, frag_tex_coord);
+    color = vec4(frag_normal, 1.0);
 }
 "#;
 
-        let img = image::open(&Path::new("data/test.bmp")).unwrap();
-        let img2 = image::open(&Path::new("data/test2.bmp")).unwrap();
-
-        let texture = renderer.create_texture_from_image(&img);
-        let texture2 = renderer.create_texture_from_image(&img2);
         let mut geometry = renderer.create_geometry(vertex_data, index_data, vdesc, IndexType::U32, vert_src, frag_src);
 
          geometry.update_params(&|params| {
-            params.set("tex", ParamValue::Texture2D(texture.param_handle()));
-            params.set("tex2", ParamValue::Texture2D(texture2.param_handle())); 
+            //params.set("tex", ParamValue::Texture2D(texture.param_handle()));
+            //params.set("tex2", ParamValue::Texture2D(texture2.param_handle()));
+            let eye = Point3::new(0f32, 0f32, 5f32);
+			let pos = Point3::new(0f32, 0f32, 0f32);
+			let up = Vector3::new(0f32, 1f32, 0f32);
+            
+            params.set("view", ParamValue::Mat4(
+               	Matrix4::look_at(eye, pos, up)
+            ));
+            params.set("projection", ParamValue::Mat4(
+                perspective(deg(65f32), 1.333f32, 0.1f32, 1000f32) 
+            ));
          });
 
         Game {

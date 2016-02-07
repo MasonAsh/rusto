@@ -5,6 +5,7 @@ pub mod buffer;
 pub mod geometry;
 pub mod texture;
 pub mod shader_params;
+pub mod util;
 
 pub use self::vertex_layout::*;
 pub use self::buffer::*;
@@ -24,7 +25,7 @@ pub trait Renderer {
 
     fn create_texture_from_image(&mut self, image_data: &DynamicImage) -> Box<Texture>;
 
-    fn create_geometry(&mut self, vertex_data: BufferData, index_data: BufferData, layout_desc: VertexLayoutDescription, index_type: IndexType, vert_src: &str, frag_src: &str) -> Box<Geometry>;
+    fn create_geometry(&mut self, vertex_data: &BufferData, index_data: &BufferData, layout_desc: &VertexLayoutDescription, index_type: IndexType, vert_src: &str, frag_src: &str) -> Box<Geometry>;
     fn draw_geometry(&mut self, geom: &mut Box<Geometry>);
 }
 
