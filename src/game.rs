@@ -6,15 +6,12 @@ use sdl2;
 use sdl2::event::{Event};
 use gl;
 use image::GenericImage;
-use cgmath::Vector3;
-use cgmath::{Matrix4, Matrix};
-use cgmath::perspective;
-use cgmath::deg;
-use cgmath::Point3;
 
 use renderer::*;
 use renderer::backends::{renderer_factory, determine_best_renderer};
 use renderer::util::mesh::{MeshOptions, load_meshes_from_file};
+
+use common::*;
 
 pub struct Game {
     running: bool,
@@ -38,6 +35,8 @@ impl Game {
         let window_title: String;
         let height: u32;
         let fullscreen: bool;
+        
+        let test: Vec3f = Vec3f::new(1.0, 0.0, 1.0);
 
         match config.get("width") {
             Some(x) => width = x.parse::<u32>().unwrap_or(640),
@@ -91,27 +90,6 @@ impl Game {
         let renderer_name = determine_best_renderer();
         let mut renderer = renderer_factory(&renderer_name).unwrap();
 
-        // let mut vdesc = VertexLayoutDescription::new();
-        // vdesc.add_element("position".to_string(), VertexElementType::F32F32);
-        // vdesc.add_element("tex_coord".to_string(), VertexElementType::F32F32);
-
-        // let tri: Vec<f32> = vec![
-        //     -0.5f32, -0.5,
-        //     0.0, 0.0,
-        //     0.0, 0.5,
-        //     0.5, 1.0,
-        //     0.5, -0.5,
-        //     1.0, 0.0,  
-        // ];
-
-        // let vertex_data = BufferData::new_initialized(tri);
-
-        // let index_vec: Vec<u32> = vec![
-        //     1, 0, 2
-        // ];
-
-        // let index_data = BufferData::new_initialized(index_vec);
-
         let mesh_data = load_meshes_from_file(&Path::new("data/sphere.obj"), &MeshOptions::default()).unwrap();
         
         let vdesc = &mesh_data[0].layout;
@@ -155,17 +133,15 @@ void main() {
         let mut geometry = renderer.create_geometry(vertex_data, index_data, vdesc, IndexType::U32, vert_src, frag_src);
 
          geometry.update_params(&|params| {
-            //params.set("tex", ParamValue::Texture2D(texture.param_handle()));
-            //params.set("tex2", ParamValue::Texture2D(texture2.param_handle()));
-            let eye = Point3::new(0f32, 0f32, 5f32);
-			let pos = Point3::new(0f32, 0f32, 0f32);
-			let up = Vector3::new(0f32, 1f32, 0f32);
+            let eye = Point3f::new(0f32, 0f32, 5f32);
+			let pos = Point3f::new(0f32, 0f32, 0f32);
+			let up = Vec3f::new(0f32, 1f32, 0f32);
             
             params.set("view", ParamValue::Mat4(
                	Matrix4::look_at(eye, pos, up)
             ));
             params.set("projection", ParamValue::Mat4(
-                perspective(deg(65f32), 1.333f32, 0.1f32, 1000f32) 
+                perspective(deg(65f32), width as f32 / height as f32, 0.1f32, 1000f32) 
             ));
          });
 

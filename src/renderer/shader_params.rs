@@ -1,4 +1,4 @@
-use cgmath::*;
+use common::*;
 
 use super::texture::TextureParamHandle;
 
@@ -6,9 +6,9 @@ use std::mem;
 
 pub enum ParamValue {
     F32(f32),
-    Vec4(Vector4<f32>),
-    Mat3(Matrix3<f32>),
-    Mat4(Matrix4<f32>),
+    Vec4(Vec4f),
+    Mat3(Mat3f),
+    Mat4(Mat4f),
     Texture2D(TextureParamHandle),
 }
 

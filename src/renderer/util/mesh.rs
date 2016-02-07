@@ -1,7 +1,6 @@
+use common::*;
+
 use assimp::Importer;
-use cgmath::Vector2;
-use cgmath::Vector3;
-use cgmath::Vector4;
 
 use std::path::Path;
 
@@ -67,44 +66,44 @@ pub fn load_meshes_from_file(path: &Path, options: &MeshOptions) -> Result<Vec<M
     for mesh in scene.mesh_iter() {
         let mut layout = VertexLayoutDescription::new();
 
-        let positions: Vec<Vector3<f32>> = mesh.vertex_iter().map(|pos| {
-            Vector3::<f32>::new(pos.x, pos.y, pos.z)
+        let positions: Vec<Vec3f> = mesh.vertex_iter().map(|pos| {
+            Vec3f::new(pos.x, pos.y, pos.z)
         }).collect();
 
         layout.add_element(options.position_attr_name.clone(), VertexElementType::F32F32F32);
 
-        let mut normals: Vec<Vector3<f32>> = Vec::new();
+        let mut normals: Vec<Vec3f> = Vec::new();
 
         if mesh.has_normals() {
             normals = mesh.normal_iter().map(|norm| {
-                Vector3::<f32>::new(norm.x, norm.y, norm.z)
+                Vec3f::new(norm.x, norm.y, norm.z)
             }).collect();
 
             layout.add_element(options.normal_attr_name.clone(), VertexElementType::F32F32F32);
         }
 
-        let mut tex_coords: Vec<Vector2<f32>> = Vec::new();
+        let mut tex_coords: Vec<Vec2f> = Vec::new();
 
         // TODO: Multiple texture coord and color channels
 
         if mesh.has_texture_coords(0) {
             tex_coords = mesh.texture_coords_iter(0).map(|coord| {
-                Vector2::<f32>::new(coord.x, coord.y)
+                Vec2f::new(coord.x, coord.y)
             }).collect();
 
             layout.add_element(options.tex_coord_attr_name.clone(), VertexElementType::F32F32);
         }
 
-        let mut tangents: Vec<Vector3<f32>> = Vec::new();
-        let mut bitangents: Vec<Vector3<f32>> = Vec::new();
+        let mut tangents: Vec<Vec3f> = Vec::new();
+        let mut bitangents: Vec<Vec3f> = Vec::new();
 
         if mesh.has_tangents_and_bitangents() {
             tangents = mesh.tangent_iter().map(|tang| {
-                Vector3::<f32>::new(tang.x, tang.y, tang.z)
+                Vec3f::new(tang.x, tang.y, tang.z)
             }).collect();
 
             bitangents = mesh.bitangent_iter().map(|bitang| {
-                Vector3::<f32>::new(bitang.x, bitang.y, bitang.z)
+                Vec3f::new(bitang.x, bitang.y, bitang.z)
             }).collect();
 
             layout.add_element(options.tangent_attr_name.clone(), VertexElementType::F32F32F32);

@@ -1,3 +1,5 @@
+use common::*;
+
 use super::super::*;
 
 use std::mem;
@@ -10,8 +12,6 @@ use std::collections::hash_map::Entry::{Occupied, Vacant};
 use gl;
 
 use gl::types::*;
-
-use cgmath::*;
 
 use image::{GenericImage, DynamicImage};
 
@@ -384,9 +384,9 @@ impl OpenGLRenderer {
             for uniform in block.uniforms.iter() {
                 let param_value: ParamValue = match uniform.utype {
                     gl::FLOAT      => ParamValue::F32(0.0),
-                    gl::FLOAT_VEC4 => ParamValue::Vec4(vec4(0.0, 0.0, 0.0, 0.0)),
-                    gl::FLOAT_MAT3 => ParamValue::Mat3(Matrix3::identity()),
-                    gl::FLOAT_MAT4 => ParamValue::Mat4(Matrix4::identity()),
+                    gl::FLOAT_VEC4 => ParamValue::Vec4(Vec4f::new(0.0, 0.0, 0.0, 0.0)),
+                    gl::FLOAT_MAT3 => ParamValue::Mat3(Mat3f::identity()),
+                    gl::FLOAT_MAT4 => ParamValue::Mat4(Mat4f::identity()),
                     _              => panic!("Unsupported shader uniform type!"),
                 };
 
