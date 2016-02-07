@@ -23,6 +23,7 @@ type VBOHandle = Handle;
 type VAOHandle = Handle;
 type IBOHandle = Handle;
 type ProgramHandle = Handle;
+type TextureHandle = Handle;
 
 struct GLVbo {
     id: GLHandle,
@@ -64,8 +65,6 @@ struct GLSampler2D {
 
 struct GLProg {
     id: GLHandle,
-    vsid: GLHandle,
-    fsid: GLHandle,
     uniform_blocks: Vec<GLUniformBlock>,
     sampler2ds: Vec<GLSampler2D>,
 }
@@ -155,8 +154,12 @@ impl GLStateManager {
     }
 }
 
+pub struct GLTex2D {
+    id: GLuint,
+}
+
 pub struct OpenGLTexture {
-    id: GLHandle,
+    texture_handle: TextureHandle,
     filter_method: FilteringMethod,
     filter_changed: bool,
     texture_format: TextureFormat,
@@ -164,7 +167,7 @@ pub struct OpenGLTexture {
 
 impl Texture for OpenGLTexture {
     fn param_handle(&self) -> TextureParamHandle {
-        self.id
+        self.texture_handle as TextureParamHandle
     }
     
     fn format(&self) -> &TextureFormat {
@@ -205,6 +208,7 @@ pub struct OpenGLRenderer {
     vbos: Vec<GLVbo>,
     ibos: Vec<GLIbo>,
     progs: Vec<GLProg>,
+    tex2ds: Vec<GLTex2D>,
     state: GLStateManager,
 }
 
@@ -215,6 +219,7 @@ impl OpenGLRenderer {
             vbos: Vec::new(),
             ibos: Vec::new(),
             progs: Vec::new(),
+            tex2ds: Vec::new(),
             state: GLStateManager::new(),
         })
     }
@@ -356,14 +361,18 @@ impl OpenGLRenderer {
                 gl::GetProgramInfoLog(program, len, ptr::null_mut(), buf.as_mut_ptr() as *mut GLchar);
                 panic!("{}", str::from_utf8(&buf).ok().expect("programinfolog not valid utf8"));
             }
+            
+            gl::DetachShader(program, vs);
+            gl::DetachShader(program, fs);
+            
+            gl::DeleteShader(vs);
+            gl::DeleteShader(fs);
         }
 
         let uniform_blocks = self.get_program_uniform_blocks(program);
         let sampler2ds = self.get_program_samplers(program);
 
         let prog = GLProg {
-            vsid: vs,
-            fsid: fs,
             id: program,
             uniform_blocks: uniform_blocks,
             sampler2ds: sampler2ds,
@@ -606,9 +615,10 @@ impl OpenGLRenderer {
         for name in changes.iter() {
             match *params.get(name) {
                 ParamValue::Texture2D(tex_handle) => {
+                    let gltexid = self.tex2ds[tex_handle as usize].id;
                     for sampler in prog.sampler2ds.iter_mut() {
                         if sampler.uniform_info.name == *name {
-                            sampler.tex_id = tex_handle;
+                            sampler.tex_id = gltexid;
                             unsafe { gl::Uniform1i(sampler.uniform_info.index as i32, sampler.tex_unit as i32); }
                             break;
                         }
@@ -646,6 +656,58 @@ impl OpenGLRenderer {
                 gl::BufferSubData(gl::UNIFORM_BUFFER, 0, block.buffer_data.bytes.len() as isize, mem::transmute(&block.buffer_data.bytes[0]));
             }
         }
+    }
+    
+    fn drop_vertex_array_objects(&mut self, vaos: Vec<VAOHandle>) {
+        let vaoids: Vec<GLHandle> = vaos.iter().map(|vao| self.vaos[*vao].id).collect();
+        unsafe {
+            gl::DeleteVertexArrays(vaoids.len() as i32, vaoids.as_ptr() as *const GLuint);
+        }
+    }
+    
+    fn drop_textures(&mut self, tex2ds: Vec<TextureHandle>) {
+        let texids: Vec<GLHandle> = tex2ds.iter().map(|tex2d| self.tex2ds[*tex2d].id).collect();
+        unsafe {
+            gl::DeleteTextures(texids.len() as i32, texids.as_ptr() as *const GLuint);
+        }
+    }
+    
+    fn drop_buffers(&mut self, buffers: Vec<GLuint>) {
+        unsafe { gl::DeleteBuffers(buffers.len() as i32, buffers.as_ptr() as *const GLuint); }
+    }
+    
+    fn drop_programs(&mut self, programs: Vec<ProgramHandle>) {
+        let mut ubos: Vec<GLuint> = Vec::new();
+        
+        {
+            let mut progs: Vec<&GLProg> = Vec::new();
+            
+            for progh in programs {
+                progs.push(&self.progs[progh]);
+            }
+            
+            
+            for prog in progs {
+                unsafe {
+                    let buffers: Vec<GLuint> = prog.uniform_blocks.iter().map(|ubo| ubo.buffer).collect();
+                    ubos.extend(buffers);
+                    
+                    gl::DeleteProgram(prog.id);
+                }
+            }
+        }
+        
+        self.drop_buffers(ubos);
+    }
+    
+    fn drop_vertex_buffer_objects(&mut self, vbos: Vec<VBOHandle>) {
+        let buffers: Vec<GLuint> = vbos.iter().map(|vbo| self.vbos[*vbo].id).collect();
+        self.drop_buffers(buffers);
+    }
+    
+    fn drop_index_buffer_objects(&mut self, ibos: Vec<IBOHandle>) {
+        let buffers: Vec<GLuint> = ibos.iter().map(|ibo| self.ibos[*ibo].id).collect();
+        self.drop_buffers(buffers);
     }
 }
 
@@ -688,8 +750,12 @@ impl Renderer for OpenGLRenderer {
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
             
+            self.tex2ds.push(GLTex2D {
+                id: tex_id,
+            });
+            
             Box::new(OpenGLTexture {
-               id: tex_id,
+               texture_handle: self.tex2ds.len() - 1,
                filter_method: FilteringMethod::Nearest,
                filter_changed: false,
                texture_format: tex_format,
@@ -727,5 +793,33 @@ impl Renderer for OpenGLRenderer {
         self.apply_shader_params(glgeom);
 
         self.draw_vertex_arrays(glgeom.vbo, glgeom.vao, glgeom.ibo, glgeom.program);
+    }
+}
+
+impl Drop for OpenGLRenderer {
+    fn drop(&mut self) {
+        fn vec_indices<T>(vec: &Vec<T>) -> Vec<usize> {
+            let mut result: Vec<usize> = Vec::new();
+            for i in 0..vec.len() {
+                result.push(i as usize);
+            }
+            
+            result
+        }
+        
+        let vao_indices = vec_indices(&self.vaos);
+        self.drop_vertex_array_objects(vao_indices);
+        
+        let tex2ds_indices = vec_indices(&self.tex2ds);
+        self.drop_textures(tex2ds_indices);
+        
+        let prog_indices = vec_indices(&self.progs);
+        self.drop_programs(prog_indices);
+        
+        let vbo_indices = vec_indices(&self.vbos);
+        self.drop_vertex_buffer_objects(vbo_indices);
+        
+        let ibo_indices = vec_indices(&self.ibos);
+        self.drop_index_buffer_objects(ibo_indices);
     }
 }

@@ -5,6 +5,7 @@ use config::load_config_file;
 use sdl2;
 use sdl2::event::{Event};
 use gl;
+use image;
 use image::GenericImage;
 
 use renderer::*;
@@ -36,8 +37,6 @@ impl Game {
         let height: u32;
         let fullscreen: bool;
         
-        let test: Vec3f = Vec3f::new(1.0, 0.0, 1.0);
-
         match config.get("width") {
             Some(x) => width = x.parse::<u32>().unwrap_or(640),
             None    => width = 640,
@@ -106,14 +105,17 @@ uniform Matrices {
 
 in vec3 position;
 in vec3 normal;
+in vec2 tex_coord;
 out vec3 frag_position;
 out vec3 frag_normal;
+out vec2 frag_tex_coord;
 
 void main() {
     vec4 final_position;
     final_position = projection * view * vec4(position, 1.0);
     frag_position = final_position.xyz;
     frag_normal = normal;
+    frag_tex_coord = tex_coord;
     gl_Position = final_position;
 }
 "#;
@@ -121,18 +123,26 @@ void main() {
         let frag_src = r#"
 #version 400
 
+uniform sampler2D tex;
+
 in vec3 frag_position;
 in vec3 frag_normal;
+in vec2 frag_tex_coord;
 out vec4 color;
 
 void main() {
-    color = vec4(frag_normal, 1.0);
+    //color = vec4(frag_normal, 1.0);
+    //color = color * texture(tex, frag_tex_coord);
+    color = texture(tex, frag_tex_coord);
 }
 "#;
 
         let mut geometry = renderer.create_geometry(vertex_data, index_data, vdesc, IndexType::U32, vert_src, frag_src);
 
-         geometry.update_params(&|params| {
+        let img = image::open(&Path::new("data/test.bmp")).unwrap();
+        let tex = renderer.create_texture_from_image(&img);
+
+        geometry.update_params(&|params| {
             let eye = Point3f::new(0f32, 0f32, 5f32);
 			let pos = Point3f::new(0f32, 0f32, 0f32);
 			let up = Vec3f::new(0f32, 1f32, 0f32);
@@ -143,7 +153,11 @@ void main() {
             params.set("projection", ParamValue::Mat4(
                 perspective(deg(65f32), width as f32 / height as f32, 0.1f32, 1000f32) 
             ));
-         });
+            
+            params.set("tex", ParamValue::Texture2D(
+                tex.param_handle(), 
+            ));
+        });
 
         Game {
             running: true,
