@@ -1,0 +1,97 @@
+// This is what a material file should probably look like.
+// Of course this is subject to change.
+
+// This file is just something to work on utill I have a
+// full specification.
+
+
+// All shader code segments are GLSL syntax
+// If a Direct3D backend is ever created, these GLSL blocks
+// will have to be coverted to HLSL, which will be a pain
+
+Name: "UnlitDiffuse"
+
+// You can put your functions in this block.
+// These functions can be used in Code and VertexModifier blocks.
+// Code inside this block is essentially #included before the
+// shader code
+Functions {
+    vec4 color_displacement(vec4 position) {
+        return vec4(sin(position.x), cos(position.y), 1.0, 1.0);
+    }
+}
+
+// Specifies the required vertex attributes.
+// Game will panic if a material is used with a mesh that does
+// not have the required attributes.
+// Vertex attributes are standard:
+// v_position -> vec3
+// v_normal -> vec3
+// v_tex_coord<n> -> vec2 // where n is the texture unit to use
+// v_color -> vec4
+// v_tangent -> vec3
+// v_bitangent -> vec3
+VertexAttributes {
+    v_position
+}
+
+// VertexModifier houses the vertex shader code.
+// If VertexModifier block is not supplied, a standard one will
+// be used.
+VertexModifier {
+    Outputs {
+        vec4 frag_position
+    }
+    Code {
+        // _position is a predefined vec4
+        _position = _model_view_proj * vec4(v_position, 1.0)
+    }
+}
+
+Pass {
+    Blend=Multiply
+    VertexInputs {
+        // Inputs from the vertex shader here.
+        frag_position
+    }
+    Parameters {
+        vec4 diffuse_color
+    }
+    Code {
+        // fragment code goes here
+        // _output is a predefined vec4 
+        _output = vec4(diffuse_color.x, diffuse_color.y, diffuse_color.z, diffuse_color.w);
+        _output = _output * displace_color(position);
+    }
+}
+
+// Outputted GLSL code should look something like this
+/*
+/////// VERTEX CODE ///////
+#version 400
+in vec3 v_position;
+out vec3 _position;
+
+uniform Matrices {
+    mat4 _model_view_proj;
+};
+
+void main() {
+    _position = _model_view_proj * vec4(v_position, 1.0);
+    gl_Position = _position;
+}
+
+/////// FRAGMENT CODE ///////
+#version 400
+uniform Material {
+    vec4 diffuse_color;    
+};
+
+in vec4 frag_position;
+out vec4 _output;
+
+void main() {
+    _output = diffuse_color;
+    _output = _output * displace_color(frag_position);
+}
+*/
