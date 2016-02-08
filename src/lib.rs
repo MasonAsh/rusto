@@ -12,6 +12,7 @@ pub use common::*;
 mod config;
 mod renderer;
 mod scene;
+pub mod material_compiler;
 pub mod game;
 
 pub use game::Game;

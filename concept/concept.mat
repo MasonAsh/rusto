@@ -9,7 +9,7 @@
 // If a Direct3D backend is ever created, these GLSL blocks
 // will have to be coverted to HLSL, which will be a pain
 
-Name: "UnlitDiffuse"
+Name: "MyBizzareMaterial"
 
 // You can put your functions in this block.
 // These functions can be used in Code and VertexModifier blocks.
@@ -40,11 +40,13 @@ VertexAttributes {
 // be used.
 VertexModifier {
     Outputs {
+        // outputs to the fragment shaders
         vec4 frag_position
     }
     Code {
-        // _position is a predefined vec4
-        _position = _model_view_proj * vec4(v_position, 1.0)
+        // _position is a predefined vec4 which gets assigned to gl_Position
+        _position = _model_view_proj * vec4(v_position, 1.0);
+        frag_position = _position;
     }
 }
 
@@ -52,14 +54,14 @@ Pass {
     Blend=Multiply
     VertexInputs {
         // Inputs from the vertex shader here.
-        frag_position
+        vec4 frag_position
     }
     Parameters {
         vec4 diffuse_color
     }
     Code {
         // fragment code goes here
-        // _output is a predefined vec4 
+        // _output is a vec4 fragment output for the color 
         _output = vec4(diffuse_color.x, diffuse_color.y, diffuse_color.z, diffuse_color.w);
         _output = _output * displace_color(position);
     }
@@ -70,14 +72,16 @@ Pass {
 /////// VERTEX CODE ///////
 #version 400
 in vec3 v_position;
-out vec3 _position;
+out vec3 frag_position;
 
 uniform Matrices {
     mat4 _model_view_proj;
 };
 
 void main() {
+    vec4 position;
     _position = _model_view_proj * vec4(v_position, 1.0);
+    frag_position = _position;
     gl_Position = _position;
 }
 
