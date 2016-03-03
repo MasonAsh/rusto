@@ -4,6 +4,7 @@ extern crate gl;
 extern crate sdl2;
 extern crate rand;
 extern crate image;
+extern crate xml;
 
 pub mod common;
 

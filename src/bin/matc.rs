@@ -1,4 +1,5 @@
 extern crate rusto;
+extern crate xml;
 
 use rusto::material_compiler::parser::parse_material_file;
 use rusto::material_compiler::MaterialCompiler;
@@ -14,7 +15,7 @@ fn main() {
     
     let compiler = MaterialCompiler::new();
     
-    let parse = parse_material_file(&Path::new(&input));
+    let parse = parse_material_file(&Path::new(&input)).unwrap();
     
     compiler.compile(parse, &Path::new(&output));
 }

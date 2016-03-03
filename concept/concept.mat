@@ -9,7 +9,7 @@
 // If a Direct3D backend is ever created, these GLSL blocks
 // will have to be coverted to HLSL, which will be a pain
 
-Name: "MyBizzareMaterial"
+Name="MyBizzareMaterial"
 
 // You can put your functions in this block.
 // These functions can be used in Code and VertexModifier blocks.

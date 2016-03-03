@@ -1,0 +1,28 @@
+<Material name="MyBizzareMaterial">
+    <Functions>
+        vec4 color_displacement(vec4 position) {
+            return vec4(sin(position.x), cos(position.y), 1.0, 1.0);
+        }
+    </Functions>
+    <VertexAttributes>
+        <Variable type="vec4" name="v_position" />
+    </VertexAttributes>
+    <VertexModifier>
+        <Outputs>
+            <Variable type="vec4" name="frag_position" />
+        </Outputs>
+        <Code>
+            _output = _model_view_proj * vec4(v_position, 1.0);
+            frag_position = _output;
+        </Code>
+    </VertexModifier>
+    <Pass BlendFunc="Add">
+        <Parameters>
+            <Param type="vec4" name="diffuse_color" editor_type="Color"/>
+        </Parameters>
+        <Code>
+            _output = vec4(diffuse_color.x, diffuse_color.y, diffuse_color.z, diffuse_color.w);
+            _output = _output * displace_color(position);
+        </Code>
+    </Pass>
+</Material>
